@@ -1,0 +1,261 @@
+{
+  "users": [
+    {
+      "id": "usr_admin",
+      "name": "Sistem Admini",
+      "phone": "+994 50 999 88 77",
+      "email": "admin@musterigps.az",
+      "passwordHash": "2017",
+      "role": "admin",
+      "status": "active",
+      "permissions": {
+        "canViewCustomers": true,
+        "canAddCustomers": true,
+        "canEditCustomers": true,
+        "canDeleteCustomers": true,
+        "canViewDrivers": true,
+        "canAddDrivers": true,
+        "canEditDrivers": true,
+        "canDeleteDrivers": true,
+        "canSendWhatsApp": true,
+        "canViewHistory": true,
+        "canOpenMap": true,
+        "canExportData": true
+      },
+      "createdAt": "2026-09-01T08:00:00.000Z",
+      "lastLoginAt": "2026-09-09T18:13:30.474Z",
+      "lastActiveAt": "2026-09-09T18:13:30.474Z"
+    },
+    {
+      "id": "usr_vusal",
+      "name": "Vüsal Sadıqov",
+      "phone": "+994 50 222 33 44",
+      "email": "vusal@musterigps.az",
+      "passwordHash": "123456",
+      "role": "user",
+      "status": "active",
+      "permissions": {
+        "canViewCustomers": true,
+        "canAddCustomers": true,
+        "canEditCustomers": true,
+        "canDeleteCustomers": true,
+        "canViewDrivers": true,
+        "canAddDrivers": true,
+        "canEditDrivers": true,
+        "canDeleteDrivers": true,
+        "canSendWhatsApp": true,
+        "canViewHistory": true,
+        "canOpenMap": true,
+        "canExportData": true
+      },
+      "createdAt": "2026-09-02T08:00:00.000Z",
+      "lastLoginAt": "2026-09-09T18:02:22.237Z",
+      "lastActiveAt": "2026-09-09T18:02:22.237Z"
+    },
+    {
+      "id": "usr_ilqar",
+      "name": "İlqar Hüseynzadə",
+      "phone": "+994 55 333 44 55",
+      "email": "ilqar@musterigps.az",
+      "passwordHash": "123456",
+      "role": "user",
+      "status": "active",
+      "permissions": {
+        "canViewCustomers": true,
+        "canAddCustomers": true,
+        "canEditCustomers": true,
+        "canDeleteCustomers": true,
+        "canViewDrivers": true,
+        "canAddDrivers": true,
+        "canEditDrivers": true,
+        "canDeleteDrivers": true,
+        "canSendWhatsApp": true,
+        "canViewHistory": true,
+        "canOpenMap": true,
+        "canExportData": true
+      },
+      "createdAt": "2026-09-03T08:00:00.000Z"
+    },
+    {
+      "id": "usr_cefer",
+      "name": "Cəfər",
+      "phone": "+994 50 123 45 67",
+      "email": "cefer@musterigps.az",
+      "passwordHash": "123456",
+      "role": "user",
+      "status": "active",
+      "permissions": {
+        "canViewCustomers": true,
+        "canAddCustomers": true,
+        "canEditCustomers": true,
+        "canDeleteCustomers": true,
+        "canViewDrivers": true,
+        "canAddDrivers": true,
+        "canEditDrivers": true,
+        "canDeleteDrivers": true,
+        "canSendWhatsApp": true,
+        "canViewHistory": true,
+        "canOpenMap": true,
+        "canExportData": true
+      },
+      "createdAt": "2026-09-04T08:00:00.000Z",
+      "lastLoginAt": "2026-09-09T15:07:38.478Z",
+      "lastActiveAt": "2026-09-09T15:07:38.478Z"
+    },
+    {
+      "id": "usr_surucu",
+      "name": "Murad Əhmədov (Sürücü)",
+      "phone": "+994 50 777 88 99",
+      "email": "surucu@musterigps.az",
+      "passwordHash": "123456",
+      "role": "driver",
+      "status": "active",
+      "permissions": {
+        "canViewCustomers": true,
+        "canAddCustomers": false,
+        "canEditCustomers": false,
+        "canDeleteCustomers": false,
+        "canViewDrivers": false,
+        "canAddDrivers": false,
+        "canEditDrivers": false,
+        "canDeleteDrivers": false,
+        "canSendWhatsApp": true,
+        "canViewHistory": true,
+        "canOpenMap": true,
+        "canExportData": false
+      },
+      "createdAt": "2026-09-05T08:00:00.000Z"
+    }
+  ],
+  "customers": [
+    {
+      "id": "c_1788977039024",
+      "userId": "usr_admin",
+      "name": "Qq",
+      "phone": "+994 50505050",
+      "address": "163,  Fəxrəddin Musayev küç.,  Nərimanov rayonu",
+      "location": {
+        "lat": 40.4093706549083,
+        "lng": 49.86336529254914,
+        "addressText": "163,  Fəxrəddin Musayev küç.,  Nərimanov rayonu"
+      },
+      "note": "",
+      "photoUrl": "",
+      "isDeleted": false,
+      "createdAt": "2026-09-09T18:03:59.024Z",
+      "updatedAt": "2026-09-09T18:03:59.024Z"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "drv_1788977049761",
+      "userId": "usr_admin",
+      "name": "Qqq",
+      "phone": "+994 504066425",
+      "note": "",
+      "status": "active",
+      "createdAt": "2026-09-09T18:04:09.761Z"
+    }
+  ],
+  "dispatches": [],
+  "auditLogs": [
+    {
+      "id": "log_1788977610474_0y0i",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "Sistemə daxil oldu",
+      "targetType": "auth",
+      "targetId": "usr_admin",
+      "targetName": "Sistem Admini",
+      "details": "Sistem Admini hesabına uğurla giriş etdi",
+      "ipAddress": "37.114.151.109",
+      "device": "iOS Tətbiqi / Safari",
+      "timestamp": "2026-09-09T18:13:30.474Z"
+    },
+    {
+      "id": "log_1788977446807_k8gi",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "İstifadəçini redaktə etdi",
+      "targetType": "user",
+      "targetId": "usr_ilqar",
+      "targetName": "İlqar Hüseynzadə",
+      "details": "Admin Sistem Admini \"İlqar Hüseynzadə\" (usr_ilqar) məlumatlarını yenilədi",
+      "ipAddress": "37.114.151.109",
+      "device": "iOS Tətbiqi / Safari",
+      "timestamp": "2026-09-09T18:10:46.807Z"
+    },
+    {
+      "id": "log_1788977431150_x2vv",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "İstifadəçini redaktə etdi",
+      "targetType": "user",
+      "targetId": "usr_vusal",
+      "targetName": "Vüsal Sadıqov",
+      "details": "Admin Sistem Admini \"Vüsal Sadıqov\" (usr_vusal) məlumatlarını yenilədi",
+      "ipAddress": "37.114.151.109",
+      "device": "iOS Tətbiqi / Safari",
+      "timestamp": "2026-09-09T18:10:31.150Z"
+    },
+    {
+      "id": "log_1788977049761_1bqw",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "Sürücü əlavə etdi",
+      "targetType": "driver",
+      "targetId": "drv_1788977049761",
+      "targetName": "Qqq",
+      "details": "Sistem Admini yeni sürücü əlavə etdi: Qqq (+994 504066425)",
+      "ipAddress": "5.191.121.159",
+      "device": "iOS Tətbiqi / Safari",
+      "timestamp": "2026-09-09T18:04:09.761Z"
+    },
+    {
+      "id": "log_1788977039024_rutq",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "Müştəri əlavə etdi",
+      "targetType": "customer",
+      "targetId": "c_1788977039024",
+      "targetName": "Qq",
+      "details": "Sistem Admini yeni müştəri əlavə etdi: Qq (+994 50505050)",
+      "ipAddress": "5.191.121.159",
+      "device": "iOS Tətbiqi / Safari",
+      "timestamp": "2026-09-09T18:03:59.024Z"
+    },
+    {
+      "id": "log_1788976942237_exr5",
+      "userId": "usr_vusal",
+      "userName": "Vüsal Əliyev",
+      "userRole": "user",
+      "action": "Sistemə daxil oldu",
+      "targetType": "auth",
+      "targetId": "usr_vusal",
+      "targetName": "Vüsal Əliyev",
+      "details": "Vüsal Əliyev hesabına uğurla giriş etdi",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop / Kompüter Brauzeri",
+      "timestamp": "2026-09-09T18:02:22.237Z"
+    },
+    {
+      "id": "log_1788976939370_4xqi",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "Sistemə daxil oldu",
+      "targetType": "auth",
+      "targetId": "usr_admin",
+      "targetName": "Sistem Admini",
+      "details": "Sistem Admini hesabına uğurla giriş etdi",
+      "ipAddress": "127.0.0.1",
+      "device": "Desktop / Kompüter Brauzeri",
+      "timestamp": "2026-09-09T18:02:19.370Z"
+    }
+  ]
+}

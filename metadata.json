@@ -1,0 +1,6 @@
+{
+  "name": "Yolda",
+  "description": "Yolda - Müştəri məlumatları, GPS konumları və sürücülərə çatdırılma idarəetmə sistemi.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
