@@ -171,7 +171,7 @@ const defaultInitialDb: DatabaseSchema = {
     },
     {
       id: 'usr_vusal',
-      name: 'Vüsal Əliyev',
+      name: 'Vüsal Sadıqov',
       phone: '+994 50 222 33 44',
       email: 'vusal@musterigps.az',
       passwordHash: '123456',
@@ -182,7 +182,7 @@ const defaultInitialDb: DatabaseSchema = {
     },
     {
       id: 'usr_ilqar',
-      name: 'İlqar Məmmədov',
+      name: 'İlqar Hüseynzadə',
       phone: '+994 55 333 44 55',
       email: 'ilqar@musterigps.az',
       passwordHash: '123456',
