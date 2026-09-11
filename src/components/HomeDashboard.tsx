@@ -49,7 +49,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const canSendWhatsApp = user?.permissions?.canSendWhatsApp !== false;
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter((c) => {
+    const list = customers.filter((c) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -71,6 +71,15 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       }
       return true;
     });
+
+    // Deduplicate by ID to guarantee unique React keys
+    const uniqueMap = new Map<string, Customer>();
+    for (const c of list) {
+      if (c && c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
+    }
+    return Array.from(uniqueMap.values());
   }, [customers, searchQuery, activeFilter, todayStr]);
 
   return (

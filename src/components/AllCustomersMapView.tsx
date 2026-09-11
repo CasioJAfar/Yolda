@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import { MapPin, Navigation, Search, MessageCircle, Phone, ExternalLink, Compass } from 'lucide-react';
 import { Customer } from '../types';
@@ -30,7 +30,16 @@ export const AllCustomersMapView: React.FC<AllCustomersMapViewProps> = ({
     });
   };
 
-  const customersWithLocation = customers.filter((c) => !!c.location);
+  const customersWithLocation = useMemo(() => {
+    const list = customers.filter((c) => !!c.location);
+    const uniqueMap = new Map<string, Customer>();
+    for (const c of list) {
+      if (c && c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
+    }
+    return Array.from(uniqueMap.values());
+  }, [customers]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;

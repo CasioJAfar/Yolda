@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Shield,
   LayoutDashboard,
@@ -237,22 +237,31 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
   };
 
   // Filter customers by user and search in all customers tab
-  const filteredCustomers = allCustomers.filter((c) => {
-    if (customerUserFilter !== 'all' && c.userId !== customerUserFilter) {
-      return false;
+  const filteredCustomers = useMemo(() => {
+    const list = allCustomers.filter((c) => {
+      if (customerUserFilter !== 'all' && c.userId !== customerUserFilter && c.ownerId !== customerUserFilter) {
+        return false;
+      }
+      const q = adminCustomerSearch.trim();
+      if (q) {
+        return (
+          matchQuery(c.name, q) ||
+          matchQuery(c.phone, q) ||
+          matchQuery(c.address || '', q) ||
+          matchQuery(c.note || '', q) ||
+          matchQuery(c.userOwnerName || '', q)
+        );
+      }
+      return true;
+    });
+    const uniqueMap = new Map<string, Customer>();
+    for (const c of list) {
+      if (c && c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
     }
-    const q = adminCustomerSearch.trim();
-    if (q) {
-      return (
-        matchQuery(c.name, q) ||
-        matchQuery(c.phone, q) ||
-        matchQuery(c.address || '', q) ||
-        matchQuery(c.note || '', q) ||
-        matchQuery(c.userOwnerName || '', q)
-      );
-    }
-    return true;
-  });
+    return Array.from(uniqueMap.values());
+  }, [allCustomers, customerUserFilter, adminCustomerSearch]);
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col md:flex-row">

@@ -28,14 +28,23 @@ export const AdminTrashTab: React.FC<AdminTrashTabProps> = ({
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [customerToDeletePermanently, setCustomerToDeletePermanently] = useState<Customer | null>(null);
 
-  const filteredTrash = trashList.filter((c) => {
-    const q = search.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      (c.userOwnerName && c.userOwnerName.toLowerCase().includes(q))
-    );
-  });
+  const filteredTrash = React.useMemo(() => {
+    const list = trashList.filter((c) => {
+      const q = search.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.userOwnerName && c.userOwnerName.toLowerCase().includes(q))
+      );
+    });
+    const uniqueMap = new Map<string, Customer>();
+    for (const c of list) {
+      if (c && c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
+    }
+    return Array.from(uniqueMap.values());
+  }, [trashList, search]);
 
   const handleRestore = async (id: string) => {
     setActionLoadingId(id);

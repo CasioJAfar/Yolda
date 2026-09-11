@@ -65,7 +65,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   };
 
   const filtered = useMemo(() => {
-    return customers.filter((c) => {
+    const list = customers.filter((c) => {
       const q = searchQuery.trim();
       const matchesSearch =
         !q ||
@@ -83,6 +83,15 @@ export const CustomerList: React.FC<CustomerListProps> = ({
 
       return true;
     });
+
+    // Ensure unique keys for React rendering
+    const uniqueMap = new Map<string, Customer>();
+    for (const c of list) {
+      if (c && c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
+    }
+    return Array.from(uniqueMap.values());
   }, [customers, searchQuery, filter, todayStr]);
 
   return (

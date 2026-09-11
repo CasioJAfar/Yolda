@@ -87,6 +87,18 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Rec
   return clean;
 }
 
+// --- Deduplication & Validation Helper ---
+export function deduplicateById<T extends { id: string }>(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
+  const map = new Map<string, T>();
+  for (const item of items) {
+    if (item && item.id) {
+      map.set(item.id, item);
+    }
+  }
+  return Array.from(map.values());
+}
+
 // --- Firestore Cloud Persistence & Realtime Sync Helpers ---
 
 export const FirebaseSync = {
@@ -136,17 +148,18 @@ export const FirebaseSync = {
   async fetchCustomersFromFirestore(user?: User | null): Promise<Customer[]> {
     try {
       const snap = await getDocs(collection(db, 'customers'));
-      const list: Customer[] = [];
+      const map = new Map<string, Customer>();
       snap.forEach((d) => {
         const data = d.data() as Customer;
-        if (data && data.id) {
+        const id = data?.id || d.id;
+        if (id) {
           // Normalize ownerId and userId
           const ownerId = data.ownerId || data.userId;
           const userId = data.userId || data.ownerId;
-          list.push({ ...data, ownerId, userId });
+          map.set(id, { ...data, id, ownerId, userId });
         }
       });
-      let filtered = list.filter((c) => !c.isDeleted);
+      let filtered = Array.from(map.values()).filter((c) => !c.isDeleted);
       if (user && user.role !== 'admin' && user.role !== 'driver') {
         filtered = filtered.filter((c) => c.ownerId === user.id || c.userId === user.id);
       }
@@ -171,16 +184,17 @@ export const FirebaseSync = {
       return onSnapshot(
         collection(db, 'customers'),
         (snap) => {
-          const list: Customer[] = [];
+          const map = new Map<string, Customer>();
           snap.forEach((d) => {
             const data = d.data() as Customer;
-            if (data && data.id) {
+            const id = data?.id || d.id;
+            if (id) {
               const ownerId = data.ownerId || data.userId;
               const userId = data.userId || data.ownerId;
-              list.push({ ...data, ownerId, userId });
+              map.set(id, { ...data, id, ownerId, userId });
             }
           });
-          let filtered = list.filter((c) => !c.isDeleted);
+          let filtered = Array.from(map.values()).filter((c) => !c.isDeleted);
           if (user && user.role !== 'admin' && user.role !== 'driver') {
             filtered = filtered.filter((c) => c.ownerId === user.id || c.userId === user.id);
           }
@@ -206,16 +220,17 @@ export const FirebaseSync = {
       return onSnapshot(
         collection(db, 'customers'),
         (snap) => {
-          const list: Customer[] = [];
+          const map = new Map<string, Customer>();
           snap.forEach((d) => {
             const data = d.data() as Customer;
-            if (data && data.id && data.isDeleted === true) {
+            const id = data?.id || d.id;
+            if (id && data.isDeleted === true) {
               const ownerId = data.ownerId || data.userId;
               const userId = data.userId || data.ownerId;
-              list.push({ ...data, ownerId, userId });
+              map.set(id, { ...data, id, ownerId, userId });
             }
           });
-          let filtered = list;
+          let filtered = Array.from(map.values());
           if (user && user.role !== 'admin') {
             filtered = filtered.filter((c) => c.ownerId === user.id || c.userId === user.id);
           }
@@ -264,16 +279,17 @@ export const FirebaseSync = {
   async fetchDriversFromFirestore(user?: User | null): Promise<Driver[]> {
     try {
       const snap = await getDocs(collection(db, 'drivers'));
-      const list: Driver[] = [];
+      const map = new Map<string, Driver>();
       snap.forEach((d) => {
         const data = d.data() as Driver;
-        if (data && data.id) {
+        const id = data?.id || d.id;
+        if (id) {
           const ownerId = data.ownerId || data.userId;
           const userId = data.userId || data.ownerId;
-          list.push({ ...data, ownerId, userId });
+          map.set(id, { ...data, id, ownerId, userId });
         }
       });
-      let filtered = list;
+      let filtered = Array.from(map.values());
       if (user && user.role !== 'admin') {
         filtered = filtered.filter((d) => d.ownerId === user.id || d.userId === user.id);
       }
@@ -296,16 +312,17 @@ export const FirebaseSync = {
       return onSnapshot(
         collection(db, 'drivers'),
         (snap) => {
-          const list: Driver[] = [];
+          const map = new Map<string, Driver>();
           snap.forEach((d) => {
             const data = d.data() as Driver;
-            if (data && data.id) {
+            const id = data?.id || d.id;
+            if (id) {
               const ownerId = data.ownerId || data.userId;
               const userId = data.userId || data.ownerId;
-              list.push({ ...data, ownerId, userId });
+              map.set(id, { ...data, id, ownerId, userId });
             }
           });
-          let filtered = list;
+          let filtered = Array.from(map.values());
           if (user && user.role !== 'admin') {
             filtered = filtered.filter((d) => d.ownerId === user.id || d.userId === user.id);
           }
@@ -340,16 +357,17 @@ export const FirebaseSync = {
   async fetchDispatchesFromFirestore(user?: User | null): Promise<DispatchRecord[]> {
     try {
       const snap = await getDocs(collection(db, 'dispatches'));
-      const list: DispatchRecord[] = [];
+      const map = new Map<string, DispatchRecord>();
       snap.forEach((d) => {
         const data = d.data() as DispatchRecord;
-        if (data && data.id) {
+        const id = data?.id || d.id;
+        if (id) {
           const ownerId = data.ownerId || data.userId;
           const userId = data.userId || data.ownerId;
-          list.push({ ...data, ownerId, userId });
+          map.set(id, { ...data, id, ownerId, userId });
         }
       });
-      let filtered = list;
+      let filtered = Array.from(map.values());
       if (user && user.role !== 'admin' && user.role !== 'driver') {
         filtered = filtered.filter((disp) => disp.ownerId === user.id || disp.userId === user.id);
       }
@@ -372,16 +390,17 @@ export const FirebaseSync = {
       return onSnapshot(
         collection(db, 'dispatches'),
         (snap) => {
-          const list: DispatchRecord[] = [];
+          const map = new Map<string, DispatchRecord>();
           snap.forEach((d) => {
             const data = d.data() as DispatchRecord;
-            if (data && data.id) {
+            const id = data?.id || d.id;
+            if (id) {
               const ownerId = data.ownerId || data.userId;
               const userId = data.userId || data.ownerId;
-              list.push({ ...data, ownerId, userId });
+              map.set(id, { ...data, id, ownerId, userId });
             }
           });
-          let filtered = list;
+          let filtered = Array.from(map.values());
           if (user && user.role !== 'admin' && user.role !== 'driver') {
             filtered = filtered.filter((disp) => disp.ownerId === user.id || disp.userId === user.id);
           }

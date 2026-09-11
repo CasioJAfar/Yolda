@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Customer, Driver, DispatchRecord, User, ActiveTab } from './types';
 import { Api } from './lib/api';
-import { FirebaseSync } from './lib/firebase';
+import { FirebaseSync, deduplicateById } from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
@@ -102,9 +102,9 @@ export default function App() {
         Api.getDrivers(),
         Api.getDispatches(),
       ]);
-      setCustomers(fetchedCustomers);
-      setDrivers(fetchedDrivers);
-      setDispatches(fetchedDispatches);
+      setCustomers(deduplicateById(fetchedCustomers));
+      setDrivers(deduplicateById(fetchedDrivers));
+      setDispatches(deduplicateById(fetchedDispatches));
     } catch (err) {
       console.error('Data loading error', err);
     } finally {
@@ -120,16 +120,16 @@ export default function App() {
 
     // 1. Real-time Firestore live synchronization across all devices (PC, Phone, Tablet)
     const unsubscribeCustomers = FirebaseSync.subscribeCustomers(currentUser, (cloudCustomers) => {
-      setCustomers(cloudCustomers);
+      setCustomers(deduplicateById(cloudCustomers));
       setIsLoading(false);
     });
 
     const unsubscribeDrivers = FirebaseSync.subscribeDrivers(currentUser, (cloudDrivers) => {
-      setDrivers(cloudDrivers);
+      setDrivers(deduplicateById(cloudDrivers));
     });
 
     const unsubscribeDispatches = FirebaseSync.subscribeDispatches(currentUser, (cloudDispatches) => {
-      setDispatches(cloudDispatches);
+      setDispatches(deduplicateById(cloudDispatches));
     });
 
     return () => {
@@ -159,14 +159,14 @@ export default function App() {
   ) => {
     if (customerToEdit) {
       const updated = await Api.updateCustomer(customerToEdit.id, data);
-      setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      setCustomers((prev) => deduplicateById(prev.map((c) => (c.id === updated.id ? updated : c))));
       if (selectedCustomerDetail?.id === updated.id) {
         setSelectedCustomerDetail(updated);
       }
       showToast('Müştəri məlumatları yeniləndi.');
     } else {
       const created = await Api.createCustomer(data as any);
-      setCustomers((prev) => [created, ...prev]);
+      setCustomers((prev) => deduplicateById([created, ...prev]));
       showToast('Yeni müştəri əlavə edildi.');
     }
     setCustomerToEdit(null);
@@ -187,11 +187,11 @@ export default function App() {
   ) => {
     if (driverToEdit) {
       const updated = await Api.updateDriver(driverToEdit.id, data);
-      setDrivers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+      setDrivers((prev) => deduplicateById(prev.map((d) => (d.id === updated.id ? updated : d))));
       showToast('Sürücü məlumatları yeniləndi.');
     } else {
       const created = await Api.createDriver(data);
-      setDrivers((prev) => [created, ...prev]);
+      setDrivers((prev) => deduplicateById([created, ...prev]));
       showToast('Yeni sürücü əlavə edildi.');
     }
     setDriverToEdit(null);
