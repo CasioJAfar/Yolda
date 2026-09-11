@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Customer, Driver, DispatchRecord, User, ActiveTab } from './types';
 import { Api } from './lib/api';
+import { FirebaseSync } from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
@@ -91,7 +92,7 @@ export default function App() {
     };
   }, []);
 
-  // Fetch Data for Current User
+  // Fetch Data for Current User & Connect Real-time Firestore Listeners
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
     setIsLoading(true);
@@ -112,9 +113,42 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchData();
-    }
+    if (!currentUser) return;
+
+    // Initial fetch
+    fetchData();
+
+    // 1. Real-time Firestore live synchronization across all devices (PC, Phone, Tablet)
+    const unsubscribeCustomers = FirebaseSync.subscribeCustomers((cloudCustomers) => {
+      let valid = cloudCustomers.filter((c) => !c.isDeleted);
+      if (currentUser.role !== 'admin' && currentUser.role !== 'driver') {
+        valid = valid.filter((c) => c.userId === currentUser.id);
+      }
+      setCustomers(valid);
+      setIsLoading(false);
+    });
+
+    const unsubscribeDrivers = FirebaseSync.subscribeDrivers((cloudDrivers) => {
+      let valid = cloudDrivers;
+      if (currentUser.role !== 'admin') {
+        valid = valid.filter((d) => d.userId === currentUser.id);
+      }
+      setDrivers(valid);
+    });
+
+    const unsubscribeDispatches = FirebaseSync.subscribeDispatches((cloudDispatches) => {
+      let valid = cloudDispatches;
+      if (currentUser.role !== 'admin' && currentUser.role !== 'driver') {
+        valid = valid.filter((disp) => disp.userId === currentUser.id);
+      }
+      setDispatches(valid);
+    });
+
+    return () => {
+      unsubscribeCustomers();
+      unsubscribeDrivers();
+      unsubscribeDispatches();
+    };
   }, [currentUser, fetchData]);
 
   // Handle Authentication

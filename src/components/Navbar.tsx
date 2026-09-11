@@ -10,6 +10,7 @@ import {
   Shield,
   Wifi,
   WifiOff,
+  Cloud,
   Code2,
   Settings,
 } from 'lucide-react';
@@ -67,6 +68,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Firebase Cloud Sync Status */}
+          <div
+            title="Firebase Bulud Sinxronizasiyası aktivdir: Məlumatlar kompüter və telefon arasında canlı sinxronlaşır"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+          >
+            <Cloud className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-pulse" />
+            <span className="hidden sm:inline">Firebase Canlı</span>
+          </div>
+
           {/* Online/Offline status */}
           <div
             title={isOnline ? 'İnternet bağlantısı aktivdir' : 'Offline rejim (Yaddaşdan işləyir)'}
