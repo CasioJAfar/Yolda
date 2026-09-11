@@ -779,9 +779,11 @@ async function startServer() {
     }
 
     const db = readDb();
+    const assignedUserId = (user.role === 'admin' && req.body.userId) ? req.body.userId : user.id;
+    const assignedOwner = db.users.find((u) => u.id === assignedUserId);
     const newCustomer: CustomerRecord = {
-      id: `c_${Date.now()}`,
-      userId: user.id, // Strictly bound to current user
+      id: req.body.id || `c_${Date.now()}`,
+      userId: assignedUserId,
       name: name.trim(),
       phone: phone.trim(),
       address: address ? address.trim() : '',
@@ -789,7 +791,7 @@ async function startServer() {
       note: note ? note.trim() : '',
       photoUrl: photoUrl || '',
       isDeleted: false,
-      createdAt: new Date().toISOString(),
+      createdAt: req.body.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
@@ -808,7 +810,7 @@ async function startServer() {
     );
 
     writeDb(db);
-    return res.status(201).json({ ...newCustomer, userOwnerName: user.name });
+    return res.status(201).json({ ...newCustomer, userOwnerName: assignedOwner?.name || user.name });
   });
 
   app.put('/api/customers/:id', (req, res) => {
@@ -1138,13 +1140,13 @@ async function startServer() {
 
     const db = readDb();
     const newDriver: DriverRecord = {
-      id: `drv_${Date.now()}`,
+      id: req.body.id || `drv_${Date.now()}`,
       userId: user.id,
       name: name.trim(),
       phone: phone.trim(),
       note: note ? note.trim() : '',
       status: status || 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: req.body.createdAt || new Date().toISOString(),
     };
 
     db.drivers.unshift(newDriver);

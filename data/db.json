@@ -160,6 +160,20 @@
   "dispatches": [],
   "auditLogs": [
     {
+      "id": "log_1789124726662_45nx",
+      "userId": "usr_admin",
+      "userName": "Sistem Admini",
+      "userRole": "admin",
+      "action": "Müştərini sildi (Zəbil qutusuna atıldı)",
+      "targetType": "customer",
+      "targetId": "c_1788977039024",
+      "targetName": "Qq",
+      "details": "Sistem Admini müştərini sildi: Qq",
+      "ipAddress": "31.170.236.66",
+      "device": "Desktop / Kompüter Brauzeri",
+      "timestamp": "2026-09-11T11:05:26.662Z"
+    },
+    {
       "id": "log_1788977610474_0y0i",
       "userId": "usr_admin",
       "userName": "Sistem Admini",

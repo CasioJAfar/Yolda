@@ -437,8 +437,8 @@ export const Api = {
   },
 
   async restoreCustomer(id: string): Promise<{ success: boolean; customer: Customer }> {
-    const existing = await Api.getCustomers();
-    const target = existing.find((c) => c.id === id);
+    const trash = await Api.getTrash();
+    const target = trash.find((c) => c.id === id);
     if (target) {
       const restored: Customer = {
         ...target,

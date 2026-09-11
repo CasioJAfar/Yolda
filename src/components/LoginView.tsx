@@ -35,6 +35,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  const quickLogin = async (idVal: string, passVal: string) => {
+    setIdentifier(idVal);
+    setPassword(passVal);
+    setError(null);
+    setLoading(true);
+    try {
+      const { user } = await Api.login(idVal, passVal);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setError(err.message || 'Giriş uğursuz oldu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white flex flex-col justify-between p-4 sm:p-6">
       {/* Top spacer */}
@@ -158,6 +173,53 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               )}
             </button>
           </form>
+
+          {/* Quick Login for Multi-device testing */}
+          <div className="mt-6 pt-5 border-t border-slate-700/60">
+            <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 text-center mb-3">
+              ⚡ Sürətli Giriş (Cihazlararası Test üçün)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => quickLogin('admin', '2017')}
+                className="py-2 px-2.5 bg-slate-700/50 hover:bg-blue-600/30 border border-slate-600/50 hover:border-blue-500/50 rounded-xl text-left transition flex flex-col group"
+              >
+                <span className="text-xs font-semibold text-white group-hover:text-blue-400">👑 Sistem Admini</span>
+                <span className="text-[10px] text-slate-400">admin / 2017</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('vusal', '123456')}
+                className="py-2 px-2.5 bg-slate-700/50 hover:bg-blue-600/30 border border-slate-600/50 hover:border-blue-500/50 rounded-xl text-left transition flex flex-col group"
+              >
+                <span className="text-xs font-semibold text-white group-hover:text-blue-400">👤 Vüsal Əliyev</span>
+                <span className="text-[10px] text-slate-400">vusal / 123456</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('cefer', '123456')}
+                className="py-2 px-2.5 bg-slate-700/50 hover:bg-blue-600/30 border border-slate-600/50 hover:border-blue-500/50 rounded-xl text-left transition flex flex-col group"
+              >
+                <span className="text-xs font-semibold text-white group-hover:text-blue-400">👤 Cəfər</span>
+                <span className="text-[10px] text-slate-400">cefer / 123456</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('surucu', '123456')}
+                className="py-2 px-2.5 bg-slate-700/50 hover:bg-blue-600/30 border border-slate-600/50 hover:border-blue-500/50 rounded-xl text-left transition flex flex-col group"
+              >
+                <span className="text-xs font-semibold text-white group-hover:text-blue-400">🚚 Sürücü Murad</span>
+                <span className="text-[10px] text-slate-400">surucu / 123456</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 text-center mt-3">
+              💡 Həm kompüterdə, həm də telefonda eyni hesabla (məs. Sistem Admini) daxil olun ki, bütün məlumatlar canlı sinxronlaşsın.
+            </p>
+          </div>
         </div>
 
         {/* Footer info */}
