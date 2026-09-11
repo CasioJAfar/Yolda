@@ -21,6 +21,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "ownerId": { "type": "string" },
         "userId": { "type": "string" },
         "userOwnerName": { "type": "string" },
         "name": { "type": "string" },
@@ -32,7 +33,7 @@
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["id", "userId", "name", "phone"]
+      "required": ["id", "ownerId", "userId", "name", "phone"]
     },
     "Driver": {
       "title": "Driver",
@@ -40,6 +41,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "ownerId": { "type": "string" },
         "userId": { "type": "string" },
         "name": { "type": "string" },
         "phone": { "type": "string" },

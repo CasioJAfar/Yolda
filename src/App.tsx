@@ -119,29 +119,17 @@ export default function App() {
     fetchData();
 
     // 1. Real-time Firestore live synchronization across all devices (PC, Phone, Tablet)
-    const unsubscribeCustomers = FirebaseSync.subscribeCustomers((cloudCustomers) => {
-      let valid = cloudCustomers.filter((c) => !c.isDeleted);
-      if (currentUser.role !== 'admin' && currentUser.role !== 'driver') {
-        valid = valid.filter((c) => c.userId === currentUser.id);
-      }
-      setCustomers(valid);
+    const unsubscribeCustomers = FirebaseSync.subscribeCustomers(currentUser, (cloudCustomers) => {
+      setCustomers(cloudCustomers);
       setIsLoading(false);
     });
 
-    const unsubscribeDrivers = FirebaseSync.subscribeDrivers((cloudDrivers) => {
-      let valid = cloudDrivers;
-      if (currentUser.role !== 'admin') {
-        valid = valid.filter((d) => d.userId === currentUser.id);
-      }
-      setDrivers(valid);
+    const unsubscribeDrivers = FirebaseSync.subscribeDrivers(currentUser, (cloudDrivers) => {
+      setDrivers(cloudDrivers);
     });
 
-    const unsubscribeDispatches = FirebaseSync.subscribeDispatches((cloudDispatches) => {
-      let valid = cloudDispatches;
-      if (currentUser.role !== 'admin' && currentUser.role !== 'driver') {
-        valid = valid.filter((disp) => disp.userId === currentUser.id);
-      }
-      setDispatches(valid);
+    const unsubscribeDispatches = FirebaseSync.subscribeDispatches(currentUser, (cloudDispatches) => {
+      setDispatches(cloudDispatches);
     });
 
     return () => {

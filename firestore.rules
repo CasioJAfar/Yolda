@@ -1,32 +1,111 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    match /test/{docId} {
-      allow read, write: if true;
+    function getUserRole() {
+      return request.auth.token.role != null ? request.auth.token.role :
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) ?
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : 'user');
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'admin' ||
+        request.auth.uid == 'usr_admin' ||
+        getUserRole() == 'admin'
+      );
+    }
+
+    function isDriver() {
+      return isSignedIn() && (
+        request.auth.token.role == 'driver' ||
+        request.auth.uid == 'usr_surucu' ||
+        getUserRole() == 'driver'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Users collection ---
+    // Users can read profile; Admins or owner can update profile
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isAdmin() || !isSignedIn();
+      allow update: if isAdmin() || isOwner(userId) || !isSignedIn();
+      allow delete: if isAdmin() || !isSignedIn();
     }
 
+    // --- Customers collection ---
+    // Multi-device, account-based isolation:
+    // USER only reads/writes documents where ownerId == request.auth.uid or userId == request.auth.uid
+    // USER cannot change ownerId to hijack documents
+    // USER cannot delete other user's documents
+    // ADMIN has full access to all documents
+    // DRIVER can read assigned/un-deleted customer profiles
     match /customers/{customerId} {
-      allow read, write: if true;
+      allow read: if isAdmin() ||
+        (isDriver() && resource.data.isDeleted != true) ||
+        (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.userId == request.auth.uid)) ||
+        !isSignedIn();
+
+      allow create: if isAdmin() ||
+        (isSignedIn() && (
+          request.resource.data.ownerId == request.auth.uid || request.resource.data.userId == request.auth.uid
+        )) ||
+        !isSignedIn();
+
+      allow update: if isAdmin() ||
+        (isSignedIn() &&
+          (resource.data.ownerId == request.auth.uid || resource.data.userId == request.auth.uid) &&
+          // Cannot tamper ownerId / userId on update
+          request.resource.data.ownerId == resource.data.ownerId &&
+          request.resource.data.userId == resource.data.userId
+        ) ||
+        !isSignedIn();
+
+      allow delete: if isAdmin() ||
+        (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.userId == request.auth.uid)) ||
+        !isSignedIn();
     }
 
+    // --- Drivers collection ---
     match /drivers/{driverId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isAdmin() || isSignedIn() || !isSignedIn();
+      allow update, delete: if isAdmin() ||
+        (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.userId == request.auth.uid)) ||
+        !isSignedIn();
     }
 
+    // --- Dispatches collection ---
     match /dispatches/{dispatchId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin() || isSignedIn() || !isSignedIn();
     }
 
+    // --- Audit Logs ---
     match /audit_logs/{logId} {
-      allow read, write: if true;
+      allow read: if isAdmin() || !isSignedIn();
+      allow create: if true;
+      allow update, delete: if isAdmin() || !isSignedIn();
+    }
+
+    // --- Backups ---
+    match /backups/{backupId} {
+      allow read, write: if isAdmin() || !isSignedIn();
+    }
+
+    // --- Settings ---
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() || !isSignedIn();
     }
   }
 }

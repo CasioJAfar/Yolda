@@ -1,4 +1,4 @@
-import { Customer, Driver, DispatchRecord, User, UserPermissions, AuditLog, DriverUserInfo, DRIVER_PERMISSIONS } from '../types';
+import { Customer, Driver, DispatchRecord, User, UserPermissions, AuditLog, DriverUserInfo, DRIVER_PERMISSIONS, ADMIN_PERMISSIONS, DEFAULT_USER_PERMISSIONS } from '../types';
 import { FirebaseSync } from './firebase';
 
 const STORAGE_KEYS = {
@@ -70,85 +70,86 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 export const Api = {
   // --- Auth ---
   async login(identifier: string, password: string): Promise<{ user: User; token: string }> {
+    const cleanId = String(identifier).trim().toLowerCase().replace(/\s+/g, '');
+
+    // 1. Check Firebase Firestore directly (Centralized Account Database across all devices)
+    try {
+      const firestoreUsers = await FirebaseSync.fetchUsersFromFirestore();
+      const matched = firestoreUsers.find((u) => {
+        const uCleanId = u.id.toLowerCase().replace(/\s+/g, '');
+        const uCleanPhone = u.phone.replace(/[^\d]/g, '');
+        const uCleanEmail = (u.email || '').toLowerCase().replace(/\s+/g, '');
+        const uCleanName = u.name.toLowerCase().replace(/\s+/g, '');
+        const idDigits = cleanId.replace(/[^\d]/g, '');
+        return (
+          uCleanId === cleanId ||
+          (idDigits && uCleanPhone.includes(idDigits)) ||
+          uCleanEmail === cleanId ||
+          uCleanName === cleanId
+        );
+      });
+
+      if (matched) {
+        if (matched.status === 'inactive') {
+          throw new Error('Bu hesab administrator tərəfindən deaktiv edilib.');
+        }
+        let valid = false;
+        if (matched.role === 'admin' || matched.id === 'usr_admin') {
+          valid = password === '2017';
+        } else {
+          valid =
+            password === '123' ||
+            password === '123456' ||
+            (matched as any).passwordHash === password;
+        }
+        if (valid) {
+          setStoredUser(matched);
+          return { user: matched, token: `fb_jwt_${matched.id}` };
+        } else {
+          throw new Error('Daxil edilən şifrə yanlışdır.');
+        }
+      }
+    } catch (fbErr: any) {
+      if (fbErr.message && (fbErr.message.includes('deaktiv') || fbErr.message.includes('şifrə'))) {
+        throw fbErr;
+      }
+      console.warn('Firebase login check warning', fbErr);
+    }
+
+    // 2. Try server auth endpoint
     try {
       const data = await apiRequest<{ user: User; token: string }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ identifier, password }),
       });
       setStoredUser(data.user);
-      // Sync user to Firestore for cloud login on all devices
-      FirebaseSync.saveUser(data.user).catch((e) => console.warn('Firebase sync user error', e));
+      FirebaseSync.saveUser(data.user).catch(() => {});
       return data;
     } catch (err: any) {
-      // Fallback: Check Firebase Firestore for users
-      try {
-        const firestoreUsers = await FirebaseSync.fetchUsersFromFirestore();
-        const cleanId = String(identifier).trim().toLowerCase().replace(/\s+/g, '');
-        const matched = firestoreUsers.find((u) => {
-          const uCleanId = u.id.toLowerCase().replace(/\s+/g, '');
-          const uCleanPhone = u.phone.replace(/[^\d]/g, '');
-          const uCleanEmail = (u.email || '').toLowerCase().replace(/\s+/g, '');
-          const uCleanName = u.name.toLowerCase().replace(/\s+/g, '');
-          const idDigits = cleanId.replace(/[^\d]/g, '');
-          return (
-            uCleanId === cleanId ||
-            (idDigits && uCleanPhone.includes(idDigits)) ||
-            uCleanEmail === cleanId ||
-            uCleanName === cleanId
-          );
-        });
-
-        if (matched) {
-          if (matched.status === 'inactive') {
-            throw new Error('Bu hesab administrator tərəfindən deaktiv edilib.');
-          }
-          let valid = false;
-          if (matched.role === 'admin' || matched.id === 'usr_admin') {
-            valid = password === '2017';
-          } else {
-            valid = password === '123' || password === '123456' || (matched as any).passwordHash === password;
-          }
-          if (valid) {
-            setStoredUser(matched);
-            return { user: matched, token: `fb_jwt_${matched.id}` };
-          }
-        }
-      } catch (fbErr) {
-        console.warn('Firebase login check warning', fbErr);
+      if (err.message && (err.message.includes('deaktiv') || err.message.includes('şifrə'))) {
+        throw err;
       }
+    }
 
-      // Offline fallback: Check if demo credentials match
-      const cleanId = String(identifier).trim().toLowerCase().replace(/\s+/g, '');
-      if (cleanId === 'admin' || cleanId === 'usr_admin' || cleanId === 'admin@musterigps.az') {
-        if (password === '2017') {
-          const fallbackAdmin: User = {
-            id: 'usr_admin',
-            name: 'Sistem Admini',
-            phone: '+994 50 999 88 77',
-            email: 'admin@musterigps.az',
-            role: 'admin',
-            status: 'active',
-            permissions: {
-              canViewCustomers: true,
-              canAddCustomers: true,
-              canEditCustomers: true,
-              canDeleteCustomers: true,
-              canViewDrivers: true,
-              canAddDrivers: true,
-              canEditDrivers: true,
-              canDeleteDrivers: true,
-              canSendWhatsApp: true,
-              canViewHistory: true,
-              canOpenMap: true,
-              canExportData: true,
-            },
-            createdAt: new Date().toISOString(),
-          };
-          setStoredUser(fallbackAdmin);
-          FirebaseSync.saveUser(fallbackAdmin).catch(() => {});
-          return { user: fallbackAdmin, token: 'mock_token' };
-        }
-      } else if (cleanId === 'vusal') {
+    // 3. Fallback: Check known demo accounts, authenticate and seed to Firestore
+    if (cleanId === 'admin' || cleanId === 'usr_admin' || cleanId === 'admin@musterigps.az') {
+      if (password === '2017') {
+        const fallbackAdmin: User = {
+          id: 'usr_admin',
+          name: 'Sistem Admini',
+          phone: '+994 50 999 88 77',
+          email: 'admin@musterigps.az',
+          role: 'admin',
+          status: 'active',
+          permissions: ADMIN_PERMISSIONS,
+          createdAt: new Date().toISOString(),
+        };
+        setStoredUser(fallbackAdmin);
+        FirebaseSync.saveUser(fallbackAdmin).catch(() => {});
+        return { user: fallbackAdmin, token: 'fb_jwt_usr_admin' };
+      }
+    } else if (cleanId === 'vusal' || cleanId === 'usr_vusal') {
+      if (password === '123' || password === '123456') {
         const fallbackVusal: User = {
           id: 'usr_vusal',
           name: 'Vüsal Əliyev',
@@ -156,25 +157,31 @@ export const Api = {
           email: 'vusal@musterigps.az',
           role: 'user',
           status: 'active',
-          permissions: {
-            canViewCustomers: true,
-            canAddCustomers: true,
-            canEditCustomers: true,
-            canDeleteCustomers: true,
-            canViewDrivers: true,
-            canAddDrivers: true,
-            canEditDrivers: true,
-            canDeleteDrivers: true,
-            canSendWhatsApp: true,
-            canViewHistory: true,
-            canOpenMap: true,
-            canExportData: true,
-          },
+          permissions: DEFAULT_USER_PERMISSIONS,
           createdAt: new Date().toISOString(),
         };
         setStoredUser(fallbackVusal);
-        return { user: fallbackVusal, token: 'mock_token' };
-      } else if (cleanId === 'ilqar') {
+        FirebaseSync.saveUser(fallbackVusal).catch(() => {});
+        return { user: fallbackVusal, token: 'fb_jwt_usr_vusal' };
+      }
+    } else if (cleanId === 'cefer' || cleanId === 'usr_cefer') {
+      if (password === '123' || password === '123456') {
+        const fallbackCefer: User = {
+          id: 'usr_cefer',
+          name: 'Cəfər',
+          phone: '+994 50 406 64 25',
+          email: 'cefer@musterigps.az',
+          role: 'user',
+          status: 'active',
+          permissions: DEFAULT_USER_PERMISSIONS,
+          createdAt: new Date().toISOString(),
+        };
+        setStoredUser(fallbackCefer);
+        FirebaseSync.saveUser(fallbackCefer).catch(() => {});
+        return { user: fallbackCefer, token: 'fb_jwt_usr_cefer' };
+      }
+    } else if (cleanId === 'ilqar' || cleanId === 'usr_ilqar') {
+      if (password === '123' || password === '123456') {
         const fallbackIlqar: User = {
           id: 'usr_ilqar',
           name: 'İlqar Məmmədov',
@@ -182,25 +189,15 @@ export const Api = {
           email: 'ilqar@musterigps.az',
           role: 'user',
           status: 'active',
-          permissions: {
-            canViewCustomers: true,
-            canAddCustomers: true,
-            canEditCustomers: true,
-            canDeleteCustomers: true,
-            canViewDrivers: true,
-            canAddDrivers: true,
-            canEditDrivers: true,
-            canDeleteDrivers: true,
-            canSendWhatsApp: true,
-            canViewHistory: true,
-            canOpenMap: true,
-            canExportData: true,
-          },
+          permissions: DEFAULT_USER_PERMISSIONS,
           createdAt: new Date().toISOString(),
         };
         setStoredUser(fallbackIlqar);
-        return { user: fallbackIlqar, token: 'mock_token' };
-      } else if (cleanId === 'surucu' || cleanId === 'driver' || cleanId === 'murad' || cleanId === 'usr_surucu') {
+        FirebaseSync.saveUser(fallbackIlqar).catch(() => {});
+        return { user: fallbackIlqar, token: 'fb_jwt_usr_ilqar' };
+      }
+    } else if (cleanId === 'surucu' || cleanId === 'driver' || cleanId === 'murad' || cleanId === 'usr_surucu') {
+      if (password === '123' || password === '123456') {
         const fallbackDriver: User = {
           id: 'usr_surucu',
           name: 'Murad Əhmədov (Sürücü)',
@@ -212,10 +209,12 @@ export const Api = {
           createdAt: new Date().toISOString(),
         };
         setStoredUser(fallbackDriver);
-        return { user: fallbackDriver, token: 'mock_token' };
+        FirebaseSync.saveUser(fallbackDriver).catch(() => {});
+        return { user: fallbackDriver, token: 'fb_jwt_usr_surucu' };
       }
-      throw err;
     }
+
+    throw new Error('İstifadəçi adı və ya şifrə yanlışdır.');
   },
 
   async register(name: string, phone: string, email: string, password: string): Promise<{ user: User; token: string }> {
@@ -246,18 +245,15 @@ export const Api = {
   async getCustomers(userIdFilter?: string): Promise<Customer[]> {
     const user = getStoredUser();
 
-    // 1. Fetch from Firebase Firestore (Cloud Database across all devices)
+    // 1. PRIMARY SOURCE OF TRUTH: Firebase Firestore Cloud Database
     try {
       const cloudCustomers = await FirebaseSync.fetchCustomersFromFirestore();
-      if (cloudCustomers && cloudCustomers.length > 0) {
+      if (cloudCustomers) {
         let valid = cloudCustomers.filter((c) => !c.isDeleted);
         if (userIdFilter) {
-          valid = valid.filter((c) => c.userId === userIdFilter);
+          valid = valid.filter((c) => c.ownerId === userIdFilter || c.userId === userIdFilter);
         } else if (user && user.role !== 'admin' && user.role !== 'driver') {
-          valid = valid.filter((c) => c.userId === user.id);
-        }
-        if (!userIdFilter) {
-          localStorage.setItem(getCustomerStorageKey(), JSON.stringify(valid));
+          valid = valid.filter((c) => c.ownerId === user.id || c.userId === user.id);
         }
         return valid;
       }
@@ -265,37 +261,30 @@ export const Api = {
       console.warn('[Firebase] Firestore getCustomers warning:', fbErr);
     }
 
-    // 2. Fallback to server API / local data
+    // 2. Fallback to server API only if Firestore network fails
     const endpoint = userIdFilter ? `/api/customers?userId=${encodeURIComponent(userIdFilter)}` : '/api/customers';
     try {
-      const list = await apiRequest<Customer[]>(endpoint);
-      if (!userIdFilter) {
-        localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      }
-      // If Firestore was empty, seed cloud database with existing customers
-      if (list && list.length > 0) {
-        FirebaseSync.saveAllCustomers(list).catch(() => {});
-      }
-      return list;
+      return await apiRequest<Customer[]>(endpoint);
     } catch (err) {
-      if (!userIdFilter) {
-        const raw = localStorage.getItem(getCustomerStorageKey());
-        const parsed: Customer[] = raw ? JSON.parse(raw) : [];
-        if (parsed.length > 0) {
-          FirebaseSync.saveAllCustomers(parsed).catch(() => {});
-        }
-        return parsed;
-      }
+      console.warn('Network fallback failed', err);
       return [];
     }
   },
 
-  async createCustomer(customer: Omit<Customer, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { userId?: string; userOwnerName?: string }): Promise<Customer> {
+  async createCustomer(
+    customer: Omit<Customer, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & {
+      ownerId?: string;
+      userId?: string;
+      userOwnerName?: string;
+    }
+  ): Promise<Customer> {
     const user = getStoredUser();
+    const targetUserId = customer.ownerId || customer.userId || user?.id || 'usr_unknown';
     const newCustomer: Customer = {
       ...customer,
       id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: customer.userId || user?.id || 'usr_unknown',
+      ownerId: targetUserId,
+      userId: targetUserId,
       userOwnerName: customer.userOwnerName || user?.name || 'Naməlum',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -308,29 +297,24 @@ export const Api = {
       console.warn('[Firebase] Cloud save error on createCustomer:', fbErr);
     }
 
-    // 2. Also send to server API to keep server in sync
-    try {
-      const created = await apiRequest<Customer>('/api/customers', {
-        method: 'POST',
-        body: JSON.stringify(newCustomer),
-      });
-      const existing = await Api.getCustomers();
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify([created, ...existing.filter((c) => c.id !== created.id)]));
-      return created;
-    } catch (err) {
-      const existing = await Api.getCustomers();
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify([newCustomer, ...existing.filter((c) => c.id !== newCustomer.id)]));
-      return newCustomer;
-    }
+    // 2. Also send to server API to keep server in sync in background
+    apiRequest<Customer>('/api/customers', {
+      method: 'POST',
+      body: JSON.stringify(newCustomer),
+    }).catch(() => {});
+
+    return newCustomer;
   },
 
   async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer> {
-    const existing = await Api.getCustomers();
-    const target = existing.find((c) => c.id === id);
+    const all = await FirebaseSync.fetchCustomersFromFirestore();
+    const target = all.find((c) => c.id === id);
     const updatedCustomer: Customer = {
-      ...(target || {} as Customer),
+      ...(target || ({} as Customer)),
       ...updates,
       id,
+      ownerId: target?.ownerId || target?.userId || updates.ownerId || updates.userId,
+      userId: target?.userId || target?.ownerId || updates.userId || updates.ownerId || 'usr_unknown',
       updatedAt: new Date().toISOString(),
     };
 
@@ -341,32 +325,26 @@ export const Api = {
       console.warn('[Firebase] Cloud save error on updateCustomer:', fbErr);
     }
 
-    // 2. Send to server API
-    try {
-      const updated = await apiRequest<Customer>(`/api/customers/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      });
-      const list = existing.map((c) => (c.id === id ? updated : c));
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      return updated;
-    } catch (err) {
-      const list = existing.map((c) => (c.id === id ? updatedCustomer : c));
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      return updatedCustomer;
-    }
+    // 2. Send to server API in background
+    apiRequest<Customer>(`/api/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }).catch(() => {});
+
+    return updatedCustomer;
   },
 
   // Admin: Update Customer Owner
   async updateCustomerOwner(id: string, newOwnerId: string): Promise<Customer> {
-    const existing = await Api.getCustomers();
-    const target = existing.find((c) => c.id === id);
+    const all = await FirebaseSync.fetchCustomersFromFirestore();
+    const target = all.find((c) => c.id === id);
     const allUsers = await Api.getAdminUsers().catch(() => []);
     const newOwner = allUsers.find((u) => u.id === newOwnerId);
 
     const updatedCustomer: Customer = {
-      ...(target || {} as Customer),
+      ...(target || ({} as Customer)),
       id,
+      ownerId: newOwnerId,
       userId: newOwnerId,
       userOwnerName: newOwner?.name || target?.userOwnerName || 'Naməlum',
       updatedAt: new Date().toISOString(),
@@ -380,26 +358,19 @@ export const Api = {
     }
 
     // 2. Also send to server API
-    try {
-      const res = await apiRequest<{ success: boolean; customer: Customer }>(`/api/admin/customers/${id}/owner`, {
-        method: 'PUT',
-        body: JSON.stringify({ newOwnerId }),
-      });
-      const list = existing.map((c) => (c.id === id ? res.customer : c));
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      return res.customer;
-    } catch (err) {
-      const list = existing.map((c) => (c.id === id ? updatedCustomer : c));
-      localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      return updatedCustomer;
-    }
+    apiRequest<{ success: boolean; customer: Customer }>(`/api/admin/customers/${id}/owner`, {
+      method: 'PUT',
+      body: JSON.stringify({ newOwnerId }),
+    }).catch(() => {});
+
+    return updatedCustomer;
   },
 
-  // Soft delete customer (moves to trash)
+  // Soft delete customer (moves to trash in Firestore)
   async deleteCustomer(id: string): Promise<{ success: boolean; id: string }> {
     const user = getStoredUser();
-    const existing = await Api.getCustomers();
-    const target = existing.find((c) => c.id === id);
+    const all = await FirebaseSync.fetchCustomersFromFirestore();
+    const target = all.find((c) => c.id === id);
 
     if (target) {
       const softDeleted: Customer = {
@@ -408,58 +379,60 @@ export const Api = {
         deletedAt: new Date().toISOString(),
         deletedBy: user?.id,
         deletedByName: user?.name,
+        updatedAt: new Date().toISOString(),
       };
       await FirebaseSync.saveCustomer(softDeleted).catch(console.warn);
     } else {
       await FirebaseSync.deleteCustomer(id).catch(console.warn);
     }
 
-    try {
-      await apiRequest(`/api/customers/${id}`, { method: 'DELETE' });
-    } catch (err) {
-      console.warn('API delete customer offline', err);
-    }
-
-    const list = existing.filter((c) => c.id !== id);
-    localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
+    apiRequest(`/api/customers/${id}`, { method: 'DELETE' }).catch(() => {});
     return { success: true, id };
   },
 
-  // --- TRASH (Soft-deleted, Admin only) ---
+  // --- TRASH (Soft-deleted in Firestore) ---
   async getTrash(): Promise<Customer[]> {
+    const user = getStoredUser();
     try {
       const cloud = await FirebaseSync.fetchCustomersFromFirestore();
-      if (cloud && cloud.length > 0) {
-        return cloud.filter((c) => c.isDeleted === true);
+      let trashed = cloud.filter((c) => c.isDeleted === true);
+      if (user && user.role !== 'admin') {
+        trashed = trashed.filter((c) => c.ownerId === user.id || c.userId === user.id);
       }
-    } catch {}
-    return apiRequest<Customer[]>('/api/trash');
+      return trashed;
+    } catch {
+      return [];
+    }
   },
 
   async restoreCustomer(id: string): Promise<{ success: boolean; customer: Customer }> {
-    const trash = await Api.getTrash();
-    const target = trash.find((c) => c.id === id);
-    if (target) {
-      const restored: Customer = {
-        ...target,
-        isDeleted: false,
-        deletedAt: undefined,
-        deletedBy: undefined,
-        deletedByName: undefined,
-        updatedAt: new Date().toISOString(),
-      };
-      await FirebaseSync.saveCustomer(restored).catch(console.warn);
-    }
-    return apiRequest<{ success: boolean; customer: Customer }>(`/api/trash/${id}/restore`, {
+    const all = await FirebaseSync.fetchCustomersFromFirestore();
+    const target = all.find((c) => c.id === id);
+    if (!target) throw new Error('Müştəri tapılmadı');
+
+    const restored: Customer = {
+      ...target,
+      isDeleted: false,
+      deletedAt: undefined,
+      deletedBy: undefined,
+      deletedByName: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await FirebaseSync.saveCustomer(restored).catch(console.warn);
+
+    apiRequest<{ success: boolean; customer: Customer }>(`/api/trash/${id}/restore`, {
       method: 'POST',
-    });
+    }).catch(() => {});
+
+    return { success: true, customer: restored };
   },
 
   async permanentDeleteCustomer(id: string): Promise<{ success: boolean }> {
     await FirebaseSync.deleteCustomer(id).catch(console.warn);
-    return apiRequest<{ success: boolean }>(`/api/trash/${id}/permanent`, {
+    apiRequest<{ success: boolean }>(`/api/trash/${id}/permanent`, {
       method: 'DELETE',
-    });
+    }).catch(() => {});
+    return { success: true };
   },
 
   // --- Drivers (Isolated per user, synchronized via Firebase) ---
@@ -469,12 +442,11 @@ export const Api = {
     // 1. Fetch from Firebase Firestore
     try {
       const cloudDrivers = await FirebaseSync.fetchDriversFromFirestore();
-      if (cloudDrivers && cloudDrivers.length > 0) {
+      if (cloudDrivers) {
         let list = cloudDrivers;
         if (user && user.role !== 'admin') {
-          list = list.filter((d) => d.userId === user.id);
+          list = list.filter((d) => d.ownerId === user.id || d.userId === user.id);
         }
-        localStorage.setItem(getDriverStorageKey(), JSON.stringify(list));
         return list;
       }
     } catch (fbErr) {
@@ -483,26 +455,22 @@ export const Api = {
 
     // 2. Fallback to server API
     try {
-      const list = await apiRequest<Driver[]>('/api/drivers');
-      localStorage.setItem(getDriverStorageKey(), JSON.stringify(list));
-      if (list && list.length > 0) {
-        for (const d of list) {
-          FirebaseSync.saveDriver(d).catch(() => {});
-        }
-      }
-      return list;
+      return await apiRequest<Driver[]>('/api/drivers');
     } catch (err) {
-      const raw = localStorage.getItem(getDriverStorageKey());
-      return raw ? JSON.parse(raw) : [];
+      return [];
     }
   },
 
-  async createDriver(driver: Omit<Driver, 'id' | 'userId' | 'createdAt'>): Promise<Driver> {
+  async createDriver(
+    driver: Omit<Driver, 'id' | 'userId' | 'createdAt'> & { ownerId?: string; userId?: string }
+  ): Promise<Driver> {
     const user = getStoredUser();
+    const targetUserId = driver.ownerId || driver.userId || user?.id || 'usr_unknown';
     const newDriver: Driver = {
       ...driver,
       id: `drv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: user?.id || 'usr_unknown',
+      ownerId: targetUserId,
+      userId: targetUserId,
       userOwnerName: user?.name,
       createdAt: new Date().toISOString(),
     };
@@ -510,57 +478,38 @@ export const Api = {
     // Save to Firebase Firestore
     await FirebaseSync.saveDriver(newDriver).catch(console.warn);
 
-    try {
-      const created = await apiRequest<Driver>('/api/drivers', {
-        method: 'POST',
-        body: JSON.stringify(driver),
-      });
-      const existing = await Api.getDrivers();
-      localStorage.setItem(getDriverStorageKey(), JSON.stringify([created, ...existing.filter((d) => d.id !== created.id)]));
-      return created;
-    } catch (err) {
-      const existing = await Api.getDrivers();
-      localStorage.setItem(getDriverStorageKey(), JSON.stringify([newDriver, ...existing.filter((d) => d.id !== newDriver.id)]));
-      return newDriver;
-    }
+    apiRequest<Driver>('/api/drivers', {
+      method: 'POST',
+      body: JSON.stringify(newDriver),
+    }).catch(() => {});
+
+    return newDriver;
   },
 
   async updateDriver(id: string, updates: Partial<Driver>): Promise<Driver> {
-    const existing = await Api.getDrivers();
-    const target = existing.find((d) => d.id === id);
+    const all = await FirebaseSync.fetchDriversFromFirestore();
+    const target = all.find((d) => d.id === id);
     const updatedDriver: Driver = {
-      ...(target || {} as Driver),
+      ...(target || ({} as Driver)),
       ...updates,
       id,
+      ownerId: target?.ownerId || target?.userId || updates.ownerId || updates.userId,
+      userId: target?.userId || target?.ownerId || updates.userId || updates.ownerId || 'usr_unknown',
     };
 
     await FirebaseSync.saveDriver(updatedDriver).catch(console.warn);
 
-    try {
-      const updated = await apiRequest<Driver>(`/api/drivers/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      });
-      const list = existing.map((d) => (d.id === id ? updated : d));
-      localStorage.setItem(getDriverStorageKey(), JSON.stringify(list));
-      return updated;
-    } catch (err) {
-      const list = existing.map((d) => (d.id === id ? updatedDriver : d));
-      localStorage.setItem(getDriverStorageKey(), JSON.stringify(list));
-      return updatedDriver;
-    }
+    apiRequest<Driver>(`/api/drivers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }).catch(() => {});
+
+    return updatedDriver;
   },
 
   async deleteDriver(id: string): Promise<{ success: boolean; id: string }> {
     await FirebaseSync.deleteDriver(id).catch(console.warn);
-    try {
-      await apiRequest(`/api/drivers/${id}`, { method: 'DELETE' });
-    } catch (err) {
-      console.warn('API delete driver offline', err);
-    }
-    const existing = await Api.getDrivers();
-    const list = existing.filter((d) => d.id !== id);
-    localStorage.setItem(getDriverStorageKey(), JSON.stringify(list));
+    apiRequest(`/api/drivers/${id}`, { method: 'DELETE' }).catch(() => {});
     return { success: true, id };
   },
 
@@ -571,12 +520,11 @@ export const Api = {
     // 1. Fetch from Firebase Firestore
     try {
       const cloudDispatches = await FirebaseSync.fetchDispatchesFromFirestore();
-      if (cloudDispatches && cloudDispatches.length > 0) {
+      if (cloudDispatches) {
         let list = cloudDispatches;
         if (user && user.role !== 'admin' && user.role !== 'driver') {
-          list = list.filter((disp) => disp.userId === user.id);
+          list = list.filter((disp) => disp.ownerId === user.id || disp.userId === user.id);
         }
-        localStorage.setItem(getDispatchStorageKey(), JSON.stringify(list));
         return list;
       }
     } catch (fbErr) {
@@ -584,26 +532,22 @@ export const Api = {
     }
 
     try {
-      const list = await apiRequest<DispatchRecord[]>('/api/dispatches');
-      localStorage.setItem(getDispatchStorageKey(), JSON.stringify(list));
-      if (list && list.length > 0) {
-        for (const disp of list) {
-          FirebaseSync.saveDispatch(disp).catch(() => {});
-        }
-      }
-      return list;
+      return await apiRequest<DispatchRecord[]>('/api/dispatches');
     } catch (err) {
-      const raw = localStorage.getItem(getDispatchStorageKey());
-      return raw ? JSON.parse(raw) : [];
+      return [];
     }
   },
 
-  async recordDispatch(record: Omit<DispatchRecord, 'id' | 'userId' | 'timestamp'>): Promise<DispatchRecord> {
+  async recordDispatch(
+    record: Omit<DispatchRecord, 'id' | 'userId' | 'timestamp'> & { ownerId?: string; userId?: string }
+  ): Promise<DispatchRecord> {
     const user = getStoredUser();
+    const targetUserId = record.ownerId || record.userId || user?.id || 'usr_unknown';
     const newRecord: DispatchRecord = {
       ...record,
       id: `disp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: user?.id || 'usr_unknown',
+      ownerId: targetUserId,
+      userId: targetUserId,
       userOwnerName: user?.name,
       timestamp: new Date().toISOString(),
     };
@@ -611,19 +555,12 @@ export const Api = {
     // Save to Firebase Firestore
     await FirebaseSync.saveDispatch(newRecord).catch(console.warn);
 
-    try {
-      const created = await apiRequest<DispatchRecord>('/api/dispatches', {
-        method: 'POST',
-        body: JSON.stringify(record),
-      });
-      const existing = await Api.getDispatches();
-      localStorage.setItem(getDispatchStorageKey(), JSON.stringify([created, ...existing]));
-      return created;
-    } catch (err) {
-      const existing = await Api.getDispatches();
-      localStorage.setItem(getDispatchStorageKey(), JSON.stringify([newRecord, ...existing]));
-      return newRecord;
-    }
+    apiRequest<DispatchRecord>('/api/dispatches', {
+      method: 'POST',
+      body: JSON.stringify(newRecord),
+    }).catch(() => {});
+
+    return newRecord;
   },
 
   // --- Audit Logs ---
@@ -786,7 +723,7 @@ export const Api = {
     return apiRequest('/api/admin/stats');
   },
 
-  // --- Backup & Restore ---
+  // --- Backup & Restore (Centralized in Firebase Firestore) ---
   async getBackup(): Promise<{
     app: string;
     version: string;
@@ -795,17 +732,47 @@ export const Api = {
     totalCustomers: number;
     customers: any[];
   }> {
-    return apiRequest('/api/backup');
+    const user = getStoredUser();
+    const allCustomers = await FirebaseSync.fetchCustomersFromFirestore();
+    const backupData = {
+      id: `backup_${Date.now()}`,
+      app: 'MusteriGPS',
+      version: '2.0.0',
+      backupDate: new Date().toISOString(),
+      user: { id: user?.id || 'usr_admin', name: user?.name || 'Sistem Admini' },
+      totalCustomers: allCustomers.length,
+      customers: allCustomers,
+    };
+    await FirebaseSync.saveBackup(backupData).catch(console.warn);
+    return backupData;
   },
 
   async restoreBackup(customers: any[]): Promise<{ success: boolean; count: number; message: string }> {
-    return apiRequest('/api/backup/restore', {
+    if (!Array.isArray(customers) || customers.length === 0) {
+      throw new Error('Bərpa etmək üçün müştəri siyahısı tapılmadı.');
+    }
+    // Write directly to Firebase Firestore
+    await FirebaseSync.saveAllCustomers(customers);
+
+    apiRequest('/api/backup/restore', {
       method: 'POST',
       body: JSON.stringify({ customers }),
-    });
+    }).catch(() => {});
+
+    return {
+      success: true,
+      count: customers.length,
+      message: `${customers.length} müştəri Firebase Firestore bulud bazasına uğurla bərpa edildi.`,
+    };
   },
 
   async getBackupInfo(): Promise<{ lastBackupAt: string | null }> {
+    try {
+      const backups = await FirebaseSync.fetchBackupsFromFirestore();
+      if (backups && backups.length > 0) {
+        return { lastBackupAt: backups[0].createdAt || backups[0].backupDate || null };
+      }
+    } catch {}
     return apiRequest('/api/backup/info');
   },
 

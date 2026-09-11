@@ -94,6 +94,7 @@ export interface CustomerLocation {
 
 export interface Customer {
   id: string;
+  ownerId?: string; // Account-based UID in Firestore
   userId: string; // Multi-user isolation
   userOwnerName?: string; // Displayed in admin panel
   name: string;
@@ -113,6 +114,7 @@ export interface Customer {
 
 export interface Driver {
   id: string;
+  ownerId?: string;
   userId: string;
   userOwnerName?: string;
   name: string;
@@ -124,6 +126,7 @@ export interface Driver {
 
 export interface DispatchRecord {
   id: string;
+  ownerId?: string;
   userId: string;
   userOwnerName?: string;
   customerId: string;
