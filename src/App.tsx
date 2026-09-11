@@ -133,7 +133,7 @@ export default function App() {
 
   // Customer Actions
   const handleSaveCustomer = async (
-    data: Omit<Customer, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+    data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'> & { userId?: string }
   ) => {
     if (customerToEdit) {
       const updated = await Api.updateCustomer(customerToEdit.id, data);
@@ -143,7 +143,7 @@ export default function App() {
       }
       showToast('Müştəri məlumatları yeniləndi.');
     } else {
-      const created = await Api.createCustomer(data);
+      const created = await Api.createCustomer(data as any);
       setCustomers((prev) => [created, ...prev]);
       showToast('Yeni müştəri əlavə edildi.');
     }
@@ -328,6 +328,7 @@ export default function App() {
       {showCustomerForm && (
         <CustomerFormModal
           initialCustomer={customerToEdit}
+          currentUser={currentUser}
           onSave={handleSaveCustomer}
           onClose={() => {
             setShowCustomerForm(false);
@@ -344,6 +345,11 @@ export default function App() {
           dispatches={dispatches}
           user={currentUser}
           onClose={() => setSelectedCustomerDetail(null)}
+          onOwnerChanged={(updated) => {
+            setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            setSelectedCustomerDetail(updated);
+            showToast(`Sahib dəyişdirildi: ${updated.userOwnerName || ''}`);
+          }}
           onEdit={() => {
             setCustomerToEdit(selectedCustomerDetail);
             setShowCustomerForm(true);

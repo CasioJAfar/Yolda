@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account in Müştəri GPS system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user", "driver"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "role", "status"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer profile with GPS coordinates and owner assignment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userOwnerName": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "note": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "phone"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Delivery driver information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "phone", "status"]
+    },
+    "Dispatch": {
+      "title": "Dispatch",
+      "description": "Delivery assignment log dispatched to drivers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "customerId", "driverId", "timestamp"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System action and security audit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "action": { "type": "string" },
+        "targetType": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and credentials"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer profiles with GPS coordinates and owner assignment"
+    },
+    "/drivers/{driverId}": {
+      "schema": "Driver",
+      "description": "Registered delivery drivers"
+    },
+    "/dispatches/{dispatchId}": {
+      "schema": "Dispatch",
+      "description": "Dispatch records and history"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System security and action audit logs"
+    }
+  }
+}

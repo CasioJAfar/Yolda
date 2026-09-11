@@ -11,12 +11,15 @@ import {
   Filter,
   Navigation,
   Compass,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import { Customer, Driver, User } from '../types';
 import { openPlatformMap } from '../lib/maps';
 import { openWazeNavigation } from '../lib/waze';
 import { ConfirmModal } from './ConfirmModal';
 import { WazeFallbackModal } from './WazeFallbackModal';
+import { matchQuery } from '../lib/search';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -47,6 +50,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   const [wazeFallbackTarget, setWazeFallbackTarget] = useState<Customer | null>(null);
   const todayStr = new Date().toISOString().split('T')[0];
 
+  const isAdmin = user?.role === 'admin';
   const canAdd = user?.permissions?.canAddCustomers !== false;
   const canEdit = user?.permissions?.canEditCustomers !== false;
   const canDelete = user?.permissions?.canDeleteCustomers !== false;
@@ -62,13 +66,14 @@ export const CustomerList: React.FC<CustomerListProps> = ({
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
-      const q = searchQuery.toLowerCase().trim();
+      const q = searchQuery.trim();
       const matchesSearch =
         !q ||
-        c.name.toLowerCase().includes(q) ||
-        c.phone.replace(/[^\d]/g, '').includes(q.replace(/[^\d]/g, '')) ||
-        c.address.toLowerCase().includes(q) ||
-        (c.note && c.note.toLowerCase().includes(q));
+        matchQuery(c.name, q) ||
+        matchQuery(c.phone, q) ||
+        matchQuery(c.address || '', q) ||
+        matchQuery(c.note || '', q) ||
+        matchQuery(c.userOwnerName || '', q);
 
       if (!matchesSearch) return false;
 
@@ -111,9 +116,17 @@ export const CustomerList: React.FC<CustomerListProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Ad, telefon və ya ünvan üzrə axtar..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition"
+          placeholder="Ad, telefon, ünvan və ya sahib üzrə axtar..."
+          className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition"
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="p-1 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Filter Tabs (Responsive 2x2 grid on mobile, 4 in a row on sm/md - No horizontal scroll!) */}
@@ -198,6 +211,12 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                       {customer.phone}
                     </p>
+                    {isAdmin && (
+                      <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5">
+                        <UserCheck className="w-3 h-3 shrink-0" />
+                        <span>Sahibi: {customer.userOwnerName || 'Naməlum'}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 

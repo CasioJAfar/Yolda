@@ -371,6 +371,58 @@ function writeDb(db: DatabaseSchema) {
   }
 }
 
+function normalizeAzText(text: string): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/ə/g, 'e')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchQueryServer(query: string, ...fields: (string | undefined | null)[]): boolean {
+  if (!query || !query.trim()) return true;
+  const rawQ = query.trim().toLowerCase();
+  const normQ = normalizeAzText(query);
+  const cleanDigitsQ = query.replace(/[^\d]/g, '');
+
+  for (const field of fields) {
+    if (!field) continue;
+    const rawF = field.toLowerCase();
+    const normF = normalizeAzText(field);
+
+    if (rawF.includes(rawQ) || normF.includes(normQ)) return true;
+
+    if (cleanDigitsQ.length >= 2) {
+      const cleanDigitsF = field.replace(/[^\d]/g, '');
+      if (cleanDigitsF.includes(cleanDigitsQ)) return true;
+
+      const localQ = cleanDigitsQ.startsWith('994') ? cleanDigitsQ.slice(3) : cleanDigitsQ.startsWith('0') ? cleanDigitsQ.slice(1) : cleanDigitsQ;
+      const localF = cleanDigitsF.startsWith('994') ? cleanDigitsF.slice(3) : cleanDigitsF.startsWith('0') ? cleanDigitsF.slice(1) : cleanDigitsF;
+
+      if (localF.includes(localQ) || localQ.includes(localF)) {
+        return true;
+      }
+    }
+  }
+
+  const tokens = normQ.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    const combinedNorm = fields.map((f) => normalizeAzText(f || '')).join(' ');
+    if (tokens.every((token) => combinedNorm.includes(token))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Log an action to auditLogs
 function recordLog(
   db: DatabaseSchema,
@@ -635,6 +687,11 @@ async function startServer() {
       list = db.customers.filter((c) => c.userId === user.id && !c.isDeleted);
     }
 
+    const searchQuery = ((req.query.q as string) || '').trim();
+    if (searchQuery) {
+      list = list.filter((c) => matchQueryServer(searchQuery, c.name, c.phone, c.address, c.note));
+    }
+
     // Attach owner name for convenience
     const enriched = list.map((c) => {
       const owner = db.users.find((u) => u.id === c.userId);
@@ -769,7 +826,7 @@ async function startServer() {
     }
 
     const { id } = req.params;
-    const { name, phone, address, location, note, photoUrl } = req.body;
+    const { name, phone, address, location, note, photoUrl, userId: newOwnerId } = req.body;
 
     const db = readDb();
     const customerIndex = db.customers.findIndex((c) => c.id === id);
@@ -782,8 +839,29 @@ async function startServer() {
       return res.status(403).json({ error: 'Bu müştərini redaktə etmək icazəniz yoxdur.' });
     }
 
+    let targetUserId = current.userId;
+    let ownerChanged = false;
+    let prevOwnerName = '';
+    let newOwnerName = '';
+
+    if (newOwnerId && newOwnerId !== current.userId) {
+      if (user.role !== 'admin') {
+        return res.status(403).json({ error: 'Müştərinin sahibini yalnız Admin dəyişə bilər.' });
+      }
+      const newOwner = db.users.find((u) => u.id === newOwnerId);
+      if (!newOwner) {
+        return res.status(400).json({ error: 'Seçilən yeni sahib (istifadəçi) tapılmadı.' });
+      }
+      const prevOwner = db.users.find((u) => u.id === current.userId);
+      prevOwnerName = prevOwner ? prevOwner.name : 'Naməlum';
+      newOwnerName = newOwner.name;
+      targetUserId = newOwnerId;
+      ownerChanged = true;
+    }
+
     const updated: CustomerRecord = {
       ...current,
+      userId: targetUserId,
       name: name !== undefined ? name.trim() : current.name,
       phone: phone !== undefined ? phone.trim() : current.phone,
       address: address !== undefined ? address.trim() : current.address,
@@ -795,20 +873,86 @@ async function startServer() {
 
     db.customers[customerIndex] = updated;
 
+    if (ownerChanged) {
+      recordLog(
+        db,
+        user,
+        'Müştərinin sahibi dəyişdirildi',
+        'customer',
+        `Müştəri: ${updated.name} | Əvvəlki sahib: ${prevOwnerName} → Yeni sahib: ${newOwnerName}`,
+        updated.id,
+        updated.name,
+        getClientIp(req),
+        getClientDevice(req)
+      );
+    } else {
+      recordLog(
+        db,
+        user,
+        'Müştəri redaktə etdi',
+        'customer',
+        `${user.name} müştəri məlumatlarını redaktə etdi: ${updated.name}`,
+        updated.id,
+        updated.name,
+        getClientIp(req),
+        getClientDevice(req)
+      );
+    }
+
+    writeDb(db);
+    const ownerObj = db.users.find((u) => u.id === updated.userId);
+    return res.json({ ...updated, userOwnerName: ownerObj?.name || 'Naməlum' });
+  });
+
+  // Dedicated Admin: Change Customer Owner endpoint
+  app.put('/api/admin/customers/:id/owner', (req, res) => {
+    const user = getAuthUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Giriş tələb olunur.' });
+    }
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Müştərinin sahibini yalnız Admin dəyişə bilər.' });
+    }
+
+    const { id } = req.params;
+    const { newOwnerId } = req.body;
+    if (!newOwnerId) {
+      return res.status(400).json({ error: 'Yeni sahib ID-si qeyd edilməlidir.' });
+    }
+
+    const db = readDb();
+    const customerIndex = db.customers.findIndex((c) => c.id === id);
+    if (customerIndex === -1) {
+      return res.status(404).json({ error: 'Müştəri tapılmadı.' });
+    }
+
+    const customer = db.customers[customerIndex];
+    const newOwner = db.users.find((u) => u.id === newOwnerId);
+    if (!newOwner) {
+      return res.status(400).json({ error: 'Seçilən istifadəçi tapılmadı.' });
+    }
+
+    const prevOwner = db.users.find((u) => u.id === customer.userId);
+    const prevOwnerName = prevOwner ? prevOwner.name : 'Naməlum';
+    const newOwnerName = newOwner.name;
+
+    customer.userId = newOwnerId;
+    customer.updatedAt = new Date().toISOString();
+
     recordLog(
       db,
       user,
-      'Müştəri redaktə etdi',
+      'Müştərinin sahibi dəyişdirildi',
       'customer',
-      `${user.name} müştəri məlumatlarını redaktə etdi: ${updated.name}`,
-      updated.id,
-      updated.name,
+      `Müştəri: ${customer.name} | Əvvəlki sahib: ${prevOwnerName} → Yeni sahib: ${newOwnerName}`,
+      customer.id,
+      customer.name,
       getClientIp(req),
       getClientDevice(req)
     );
 
     writeDb(db);
-    return res.json(updated);
+    return res.json({ success: true, customer: { ...customer, userOwnerName: newOwnerName } });
   });
 
   // Soft Delete Customer

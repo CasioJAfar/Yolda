@@ -15,9 +15,12 @@ import {
   RefreshCw,
   Database,
   Lock,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import { User, Customer, Driver, DispatchRecord, AuditLog, AdminSection, UserPermissions } from '../../types';
 import { Api } from '../../lib/api';
+import { matchQuery } from '../../lib/search';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminDashboardOverview } from './AdminDashboardOverview';
 import { AdminUsersTab } from './AdminUsersTab';
@@ -28,6 +31,7 @@ import { AdminPermissionsModal } from './AdminPermissionsModal';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
 import { ConfirmModal } from '../ConfirmModal';
+import { ChangeOwnerModal } from '../ChangeOwnerModal';
 
 interface AdminFullPanelProps {
   currentUser: User;
@@ -62,6 +66,21 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
 
   // Customer / Driver filter by user
   const [customerUserFilter, setCustomerUserFilter] = useState<string>('all');
+  const [adminCustomerSearch, setAdminCustomerSearch] = useState<string>('');
+  const [customerToChangeOwner, setCustomerToChangeOwner] = useState<Customer | null>(null);
+
+  const handleOwnerSaved = async (customerId: string, newOwnerId: string) => {
+    try {
+      const updated = await Api.updateCustomerOwner(customerId, newOwnerId);
+      setAllCustomers((prev) => prev.map((c) => (c.id === customerId ? updated : c)));
+      setCustomerToChangeOwner(null);
+      if (onRefreshAll) onRefreshAll();
+      // Reload logs to reflect owner change audit log
+      Api.getAuditLogs({ limit: 300 }).then(setLogs).catch(console.error);
+    } catch (err: any) {
+      alert(err.message || 'Sahib dəyişdirilərkən xəta baş verdi');
+    }
+  };
 
   useEffect(() => {
     loadAllData();
@@ -217,10 +236,22 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
     }
   };
 
-  // Filter customers by user in all customers tab
+  // Filter customers by user and search in all customers tab
   const filteredCustomers = allCustomers.filter((c) => {
-    if (customerUserFilter === 'all') return true;
-    return c.userId === customerUserFilter;
+    if (customerUserFilter !== 'all' && c.userId !== customerUserFilter) {
+      return false;
+    }
+    const q = adminCustomerSearch.trim();
+    if (q) {
+      return (
+        matchQuery(c.name, q) ||
+        matchQuery(c.phone, q) ||
+        matchQuery(c.address || '', q) ||
+        matchQuery(c.note || '', q) ||
+        matchQuery(c.userOwnerName || '', q)
+      );
+    }
+    return true;
   });
 
   return (
@@ -346,25 +377,48 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
           {currentSection === 'customers' && (
             <div className="space-y-4">
               <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Sahibinə görə filtr:
-                  </span>
-                  <select
-                    value={customerUserFilter}
-                    onChange={(e) => setCustomerUserFilter(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                  >
-                    <option value="all">Bütün İstifadəçilər ({allCustomers.length})</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({allCustomers.filter((c) => c.userId === u.id).length})
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                  {/* Search bar */}
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={adminCustomerSearch}
+                      onChange={(e) => setAdminCustomerSearch(e.target.value)}
+                      placeholder="Müştəri, telefon və ya sahib axtar..."
+                      className="w-full pl-9 pr-8 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {adminCustomerSearch && (
+                      <button
+                        onClick={() => setAdminCustomerSearch('')}
+                        className="p-1 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Sahibi:
+                    </span>
+                    <select
+                      value={customerUserFilter}
+                      onChange={(e) => setCustomerUserFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                    >
+                      <option value="all">Bütün İstifadəçilər ({allCustomers.length})</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({allCustomers.filter((c) => c.userId === u.id).length})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500">
+
+                <div className="text-xs text-slate-500 shrink-0">
                   Göstərilir: <span className="font-bold text-slate-900 dark:text-white">{filteredCustomers.length}</span> müştəri
                 </div>
               </div>
@@ -376,23 +430,41 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
                     className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">{c.name}</h4>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          Sahibi: {c.userOwnerName}
-                        </span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">{c.name}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{c.phone}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCustomerToChangeOwner(c)}
+                          className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition flex items-center gap-1 cursor-pointer shrink-0"
+                          title="Sahibini dəyiş"
+                        >
+                          <UserCheck className="w-3 h-3" />
+                          <span>{c.userOwnerName || 'Naməlum'}</span>
+                        </button>
                       </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{c.phone}</p>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{c.address}</p>
+                      <p className="text-[11px] text-slate-500 mt-2 line-clamp-2">{c.address || 'Ünvan qeyd edilməyib'}</p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>{new Date(c.createdAt).toLocaleDateString('az-AZ')}</span>
-                      {c.location && (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                          GPS Təyin Edilib
-                        </span>
-                      )}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <span>{new Date(c.createdAt).toLocaleDateString('az-AZ')}</span>
+                        {c.location && (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                            GPS Var
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerToChangeOwner(c)}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Sahibini dəyiş</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -696,6 +768,18 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* Admin Change Customer Owner Modal (Requirement 1, 4, 5) */}
+      {customerToChangeOwner && (
+        <ChangeOwnerModal
+          isOpen={true}
+          customer={customerToChangeOwner}
+          users={users}
+          currentUserId={currentUser.id}
+          onClose={() => setCustomerToChangeOwner(null)}
+          onSave={handleOwnerSaved}
+        />
       )}
     </div>
   );

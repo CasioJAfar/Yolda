@@ -14,40 +14,72 @@ import {
   Compass,
   Clock,
   Send,
+  UserCheck,
 } from 'lucide-react';
 import { Customer, DispatchRecord, Driver, User } from '../types';
 import { openPlatformMap, getGoogleMapsUrl } from '../lib/maps';
 import { openWazeNavigation } from '../lib/waze';
 import { ConfirmModal } from './ConfirmModal';
 import { WazeFallbackModal } from './WazeFallbackModal';
+import { ChangeOwnerModal } from './ChangeOwnerModal';
+import { Api } from '../lib/api';
 
 interface CustomerDetailModalProps {
   customer: Customer;
   drivers: Driver[];
   dispatches: DispatchRecord[];
   user?: User | null;
+  allUsers?: User[];
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onOpenSendToDriver: () => void;
+  onOwnerChanged?: (updatedCustomer: Customer) => void;
 }
 
 export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
-  customer,
+  customer: initialCustomer,
   dispatches,
   user,
+  allUsers: propUsers,
   onClose,
   onEdit,
   onDelete,
   onOpenSendToDriver,
+  onOwnerChanged,
 }) => {
+  const [customer, setCustomer] = useState<Customer>(initialCustomer);
   const [copiedLocation, setCopiedLocation] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showWazeFallback, setShowWazeFallback] = useState(false);
+  const [isChangeOwnerOpen, setIsChangeOwnerOpen] = useState(false);
+  const [userList, setUserList] = useState<User[]>(propUsers || []);
+
+  const isAdmin = user?.role === 'admin';
   const canEdit = user?.permissions?.canEditCustomers !== false;
   const canDelete = user?.permissions?.canDeleteCustomers !== false;
   const canSendWhatsApp = user?.permissions?.canSendWhatsApp !== false;
   const canOpenMap = user?.permissions?.canOpenMap !== false;
+
+  React.useEffect(() => {
+    setCustomer(initialCustomer);
+  }, [initialCustomer]);
+
+  React.useEffect(() => {
+    if (isAdmin && (!propUsers || propUsers.length === 0)) {
+      Api.getAdminUsers().then(setUserList).catch(console.error);
+    } else if (propUsers) {
+      setUserList(propUsers);
+    }
+  }, [isAdmin, propUsers]);
+
+  const handleSaveNewOwner = async (customerId: string, newOwnerId: string) => {
+    const updated = await Api.updateCustomerOwner(customerId, newOwnerId);
+    setCustomer(updated);
+    if (onOwnerChanged) {
+      onOwnerChanged(updated);
+    }
+  };
 
   // Filter history for this customer
   const customerHistory = dispatches.filter((dp) => dp.customerId === customer.id);
@@ -165,6 +197,27 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Owner Section (Requirement 1, 4, 5) */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 dark:text-slate-500 font-medium">Sahibi</span>
+                <div className="mt-0.5 font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-500" />
+                  <span>{customer.userOwnerName || 'Naməlum'}</span>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsChangeOwnerOpen(true)}
+                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-300 rounded-lg text-xs font-semibold border border-blue-200 dark:border-blue-800 transition cursor-pointer"
+                >
+                  Sahibini dəyiş
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Map Preview Box (Mockup #6 style) */}
@@ -320,6 +373,18 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             lng={customer.location.lng}
             customerName={customer.name}
             address={customer.address}
+          />
+        )}
+
+        {/* Admin: Change Customer Owner Modal (Requirement 1, 4, 5) */}
+        {isAdmin && (
+          <ChangeOwnerModal
+            isOpen={isChangeOwnerOpen}
+            customer={customer}
+            users={userList}
+            currentUserId={user?.id || ''}
+            onClose={() => setIsChangeOwnerOpen(false)}
+            onSave={handleSaveNewOwner}
           />
         )}
       </div>

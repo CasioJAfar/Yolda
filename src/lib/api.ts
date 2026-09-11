@@ -1,4 +1,5 @@
 import { Customer, Driver, DispatchRecord, User, UserPermissions, AuditLog, DriverUserInfo, DRIVER_PERMISSIONS } from '../types';
+import { FirebaseSync } from './firebase';
 
 const STORAGE_KEYS = {
   USER: 'musteri_gps_user',
@@ -237,10 +238,13 @@ export const Api = {
       });
       const existing = await Api.getCustomers();
       localStorage.setItem(getCustomerStorageKey(), JSON.stringify([created, ...existing.filter((c) => c.id !== created.id)]));
+      // Sync to Firebase Cloud
+      FirebaseSync.saveCustomer(created).catch((e) => console.warn('Firebase sync error', e));
       return created;
     } catch (err) {
       const existing = await Api.getCustomers();
       localStorage.setItem(getCustomerStorageKey(), JSON.stringify([newCustomer, ...existing]));
+      FirebaseSync.saveCustomer(newCustomer).catch((e) => console.warn('Firebase sync error', e));
       return newCustomer;
     }
   },
@@ -254,13 +258,33 @@ export const Api = {
       const existing = await Api.getCustomers();
       const list = existing.map((c) => (c.id === id ? updated : c));
       localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
+      // Sync to Firebase Cloud
+      FirebaseSync.saveCustomer(updated).catch((e) => console.warn('Firebase sync error', e));
       return updated;
     } catch (err) {
       const existing = await Api.getCustomers();
       const list = existing.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c));
       localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
-      return list.find((c) => c.id === id)!;
+      const target = list.find((c) => c.id === id)!;
+      if (target) {
+        FirebaseSync.saveCustomer(target).catch((e) => console.warn('Firebase sync error', e));
+      }
+      return target;
     }
+  },
+
+  // Admin: Update Customer Owner
+  async updateCustomerOwner(id: string, newOwnerId: string): Promise<Customer> {
+    const res = await apiRequest<{ success: boolean; customer: Customer }>(`/api/admin/customers/${id}/owner`, {
+      method: 'PUT',
+      body: JSON.stringify({ newOwnerId }),
+    });
+    const existing = await Api.getCustomers();
+    const list = existing.map((c) => (c.id === id ? res.customer : c));
+    localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
+    // Sync to Firebase Cloud
+    FirebaseSync.saveCustomer(res.customer).catch((e) => console.warn('Firebase sync error', e));
+    return res.customer;
   },
 
   // Soft delete customer (moves to trash)
@@ -273,6 +297,8 @@ export const Api = {
     const existing = await Api.getCustomers();
     const list = existing.filter((c) => c.id !== id);
     localStorage.setItem(getCustomerStorageKey(), JSON.stringify(list));
+    // Remove or soft-update in Firebase
+    FirebaseSync.deleteCustomer(id).catch((e) => console.warn('Firebase sync error', e));
     return { success: true, id };
   },
 

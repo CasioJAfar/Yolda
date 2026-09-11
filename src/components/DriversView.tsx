@@ -13,6 +13,7 @@ import {
 import { Driver, User } from '../types';
 import { openWhatsApp } from '../lib/whatsapp';
 import { ConfirmModal } from './ConfirmModal';
+import { matchQuery } from '../lib/search';
 
 interface DriversViewProps {
   drivers: Driver[];
@@ -40,13 +41,14 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const canSendWhatsApp = user?.permissions?.canSendWhatsApp !== false;
 
   const filtered = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return drivers;
     return drivers.filter((d) => {
-      const q = searchQuery.toLowerCase().trim();
       return (
-        !q ||
-        d.name.toLowerCase().includes(q) ||
-        d.phone.replace(/[^\d]/g, '').includes(q.replace(/[^\d]/g, '')) ||
-        (d.note && d.note.toLowerCase().includes(q))
+        matchQuery(d.name, q) ||
+        matchQuery(d.phone, q) ||
+        matchQuery(d.note || '', q) ||
+        matchQuery(d.userOwnerName || '', q)
       );
     });
   }, [drivers, searchQuery]);
