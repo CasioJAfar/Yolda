@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, Truck, Map, History, Shield } from 'lucide-react';
+import { Home, Users, Truck, Map, History, Shield, Package } from 'lucide-react';
 import { ActiveTab, User } from '../types';
 
 interface BottomNavProps {
@@ -11,6 +11,7 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onChangeTab, user }) => {
   const tabs: { id: ActiveTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'home', label: 'Əsas', icon: Home },
+    { id: 'orders', label: 'Sifarişlər', icon: Package },
     { id: 'customers', label: 'Müştərilər', icon: Users },
     { id: 'drivers', label: 'Sürücülər', icon: Truck },
     { id: 'map', label: 'Xəritə', icon: Map },

@@ -90,6 +90,21 @@ service cloud.firestore {
       allow write: if isAdmin() || isSignedIn() || !isSignedIn();
     }
 
+    // --- Orders collection (Real-time orders, claims, GPS tracking) ---
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // --- Active Dispatches (Real-time GPS tracking every 15s) ---
+    match /activeDispatches/{dispatchId} {
+      allow read, write: if true;
+    }
+
+    // --- Notifications collection ---
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
     // --- Audit Logs ---
     match /audit_logs/{logId} {
       allow read: if isAdmin() || !isSignedIn();

@@ -8,6 +8,7 @@ import { LoginView } from './components/LoginView';
 import { HomeDashboard } from './components/HomeDashboard';
 import { CustomerList } from './components/CustomerList';
 import { DriversView } from './components/DriversView';
+import { OrdersView } from './components/OrdersView';
 import { AllCustomersMapView } from './components/AllCustomersMapView';
 import { DispatchHistoryView } from './components/DispatchHistoryView';
 import { AdminPanelView } from './components/AdminPanelView';
@@ -45,6 +46,7 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [dispatches, setDispatches] = useState<DispatchRecord[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Modals & Drawers
@@ -97,19 +99,48 @@ export default function App() {
     if (!currentUser) return;
     setIsLoading(true);
     try {
-      const [fetchedCustomers, fetchedDrivers, fetchedDispatches] = await Promise.all([
+      const [fetchedCustomers, fetchedDrivers, fetchedDispatches, fetchedUsers] = await Promise.all([
         Api.getCustomers(),
         Api.getDrivers(),
         Api.getDispatches(),
+        Api.getAdminUsers().catch(() => []),
       ]);
       setCustomers(deduplicateById(fetchedCustomers));
       setDrivers(deduplicateById(fetchedDrivers));
       setDispatches(deduplicateById(fetchedDispatches));
+      if (fetchedUsers && fetchedUsers.length > 0) {
+        setAllUsers(fetchedUsers);
+      }
     } catch (err) {
       console.error('Data loading error', err);
     } finally {
       setIsLoading(false);
     }
+  }, [currentUser]);
+
+  // Real-time Heartbeat Presence updater for logged in user and driver
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Send initial presence ping
+    FirebaseSync.updateUserPresence(currentUser.id, true);
+    if (currentUser.role === 'driver') {
+      FirebaseSync.updateDriverPresence(currentUser.id, true);
+    }
+
+    // Regular heartbeat every 40 seconds
+    const interval = setInterval(() => {
+      if (navigator.onLine) {
+        FirebaseSync.updateUserPresence(currentUser.id, true);
+        if (currentUser.role === 'driver') {
+          FirebaseSync.updateDriverPresence(currentUser.id, true);
+        }
+      }
+    }, 40000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -261,6 +292,7 @@ export default function App() {
                 user={currentUser}
                 customers={customers}
                 drivers={drivers}
+                allUsers={allUsers}
                 onOpenAddCustomer={() => {
                   setCustomerToEdit(null);
                   setShowCustomerForm(true);
@@ -268,6 +300,15 @@ export default function App() {
                 onSelectCustomer={(c) => setSelectedCustomerDetail(c)}
                 onQuickSendToDriver={(c) => setCustomerToSendToDriver(c)}
                 onNavigateToTab={(tab) => setActiveTab(tab)}
+              />
+            )}
+
+            {activeTab === 'orders' && (
+              <OrdersView
+                user={currentUser}
+                customers={customers}
+                drivers={drivers}
+                allUsers={allUsers}
               />
             )}
 
@@ -294,6 +335,7 @@ export default function App() {
               <DriversView
                 drivers={drivers}
                 user={currentUser}
+                allUsers={allUsers}
                 onOpenAddDriver={() => {
                   setDriverToEdit(null);
                   setShowDriverForm(true);

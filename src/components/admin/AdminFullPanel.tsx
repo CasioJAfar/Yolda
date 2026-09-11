@@ -24,6 +24,8 @@ import { matchQuery } from '../../lib/search';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminDashboardOverview } from './AdminDashboardOverview';
 import { AdminUsersTab } from './AdminUsersTab';
+import { AdminOnlineDriversTab } from './AdminOnlineDriversTab';
+import { OrdersView } from '../OrdersView';
 import { AdminTrashTab } from './AdminTrashTab';
 import { AdminLogsTab } from './AdminLogsTab';
 import { UserProfileModal } from './UserProfileModal';
@@ -293,6 +295,10 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
               <span className="font-bold text-slate-900 dark:text-white text-sm capitalize">
                 {currentSection === 'dashboard'
                   ? 'İdarəetmə Paneli'
+                  : currentSection === 'online-drivers'
+                  ? 'Canlı Onlayn Sürücülər & İstifadəçilər'
+                  : currentSection === 'orders'
+                  ? 'Bütün Sifarişlər'
                   : currentSection === 'users'
                   ? 'İstifadəçilər'
                   : currentSection === 'customers'
@@ -338,6 +344,8 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
           {(
             [
               { id: 'dashboard', label: 'Dashboard' },
+              { id: 'online-drivers', label: 'Onlayn Sürücülər' },
+              { id: 'orders', label: 'Sifarişlər' },
               { id: 'users', label: 'İstifadəçilər' },
               { id: 'customers', label: 'Müştərilər' },
               { id: 'drivers', label: 'Sürücülər' },
@@ -368,6 +376,23 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
               users={users}
               onNavigate={setCurrentSection}
               onViewUser={handleViewUserById}
+            />
+          )}
+
+          {currentSection === 'online-drivers' && (
+            <AdminOnlineDriversTab
+              drivers={allDrivers}
+              users={users}
+              onRefresh={loadAllData}
+            />
+          )}
+
+          {currentSection === 'orders' && (
+            <OrdersView
+              user={currentUser}
+              customers={allCustomers}
+              drivers={allDrivers}
+              allUsers={users}
             />
           )}
 

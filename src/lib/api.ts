@@ -1,4 +1,4 @@
-import { Customer, Driver, DispatchRecord, User, UserPermissions, AuditLog, DriverUserInfo, DRIVER_PERMISSIONS, ADMIN_PERMISSIONS, DEFAULT_USER_PERMISSIONS } from '../types';
+import { Customer, Driver, DispatchRecord, User, UserPermissions, AuditLog, DriverUserInfo, DRIVER_PERMISSIONS, ADMIN_PERMISSIONS, DEFAULT_USER_PERMISSIONS, Order, OrderStatus, AppNotification } from '../types';
 import { FirebaseSync } from './firebase';
 
 const STORAGE_KEYS = {
@@ -802,5 +802,145 @@ export const Api = {
       method: 'POST',
       body: JSON.stringify({ customerId }),
     });
+  },
+
+  // --- Orders & Live Tracking API ---
+  async getOrders(): Promise<Order[]> {
+    const user = getStoredUser();
+    try {
+      const orders = await FirebaseSync.fetchOrdersFromFirestore(user);
+      return orders;
+    } catch {
+      return [];
+    }
+  },
+
+  async createOrder(orderData: {
+    customerId?: string;
+    customerName: string;
+    phone: string;
+    address: string;
+    location: { lat: number; lng: number; addressText?: string };
+    note?: string;
+  }): Promise<Order> {
+    const user = getStoredUser();
+    const now = new Date().toISOString();
+    const orderNumber = `SF-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newOrder: Order = {
+      id: `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      orderNumber,
+      customerId: orderData.customerId,
+      customerName: orderData.customerName,
+      phone: orderData.phone,
+      address: orderData.address,
+      location: orderData.location,
+      note: orderData.note || '',
+      createdByUserId: user?.id || 'usr_guest',
+      createdByUserName: user?.name || 'İstifadəçi',
+      createdByUserPhone: user?.phone || '',
+      createdAt: now,
+      updatedAt: now,
+      status: 'open',
+      history: [
+        {
+          id: `hist_${Date.now()}`,
+          action: 'created',
+          actionText: `${user?.name || 'İstifadəçi'} sifariş yaratdı`,
+          timestamp: now,
+        },
+      ],
+      routePoints: [],
+    };
+
+    await FirebaseSync.saveOrder(newOrder);
+
+    // Audit log
+    await this.logAudit({
+      action: 'Yeni sifariş yaratdı',
+      targetType: 'order',
+      targetId: newOrder.id,
+      targetName: `${newOrder.orderNumber} (${newOrder.customerName})`,
+      details: `${newOrder.customerName} üçün ${newOrder.address} ünvanına yeni sifariş açıldı.`,
+    });
+
+    return newOrder;
+  },
+
+  async claimOrder(
+    orderId: string,
+    driver: { id: string; name: string; phone?: string; location?: { lat: number; lng: number } }
+  ): Promise<{ success: boolean; error?: string; order?: Order }> {
+    const result = await FirebaseSync.claimOrder(orderId, driver);
+    if (result.success) {
+      await this.logAudit({
+        action: 'Sifarişi götürdü ("Mən apararam")',
+        targetType: 'order',
+        targetId: orderId,
+        details: `${driver.name} sifarişi təhvil aldı və çatdırmaq üçün götürdü.`,
+      });
+    }
+    return result;
+  },
+
+  async rejectOrder(
+    orderId: string,
+    driver: { id: string; name: string; phone?: string },
+    reason?: string
+  ): Promise<{ success: boolean; error?: string; order?: Order }> {
+    const result = await FirebaseSync.rejectOrder(orderId, driver, reason);
+    if (result.success) {
+      await this.logAudit({
+        action: 'Sifarişdən imtina etdi',
+        targetType: 'order',
+        targetId: orderId,
+        details: `${driver.name} sifarişdən imtina etdi. Sifariş yenidən bütün sürücülər üçün açıldı.`,
+      });
+    }
+    return result;
+  },
+
+  async updateOrderStatus(
+    orderId: string,
+    status: OrderStatus,
+    driver?: { id: string; name: string; phone?: string },
+    note?: string
+  ): Promise<void> {
+    await FirebaseSync.updateOrderStatus(orderId, status, driver, note);
+    await this.logAudit({
+      action: `Sifariş statusu yeniləndi: ${status}`,
+      targetType: 'order',
+      targetId: orderId,
+      details: `${driver?.name || 'Sürücü'} sifarişin statusunu "${status}" olaraq dəyişdi.`,
+    });
+  },
+
+  async updateOrderDriverLocation(
+    orderId: string,
+    lat: number,
+    lng: number,
+    speed?: number
+  ): Promise<void> {
+    await FirebaseSync.updateOrderDriverLocation(orderId, lat, lng, speed);
+  },
+
+  async dismissOrder(orderId: string, driverId: string): Promise<{ success: boolean; error?: string }> {
+    return await FirebaseSync.dismissOrderForDriver(orderId, driverId);
+  },
+
+  async reportDeliveryIssue(
+    orderId: string,
+    driver: { id: string; name: string; phone?: string },
+    reason: string
+  ): Promise<{ success: boolean; error?: string; order?: Order }> {
+    const res = await FirebaseSync.reportDeliveryIssue(orderId, driver, reason);
+    if (res.success) {
+      await this.logAudit({
+        action: 'Müştəri yerində yoxdur bildirişi',
+        targetType: 'order',
+        targetId: orderId,
+        details: `${driver.name} bildirdi ki, müştəri yerində yoxdur: ${reason}`,
+      });
+    }
+    return res;
   },
 };

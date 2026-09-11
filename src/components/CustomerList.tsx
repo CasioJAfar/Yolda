@@ -229,16 +229,24 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                   </div>
                 </div>
 
-                {customer.location ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>Konum var</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
-                    Konum yoxdur
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  {customer.hasActiveOrder && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                      <span>Sifarişi var</span>
+                    </span>
+                  )}
+                  {customer.location ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Konum var</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                      Konum yoxdur
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Address / Note */}

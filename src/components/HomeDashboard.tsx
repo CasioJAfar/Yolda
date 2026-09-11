@@ -12,17 +12,20 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
+  Package,
 } from 'lucide-react';
 import { Customer, Driver, User } from '../types';
+import { isDriverOnline } from '../lib/userPresence';
 
 interface HomeDashboardProps {
   user: User | null;
   customers: Customer[];
   drivers: Driver[];
+  allUsers?: User[];
   onOpenAddCustomer: () => void;
   onSelectCustomer: (customer: Customer) => void;
   onQuickSendToDriver: (customer: Customer) => void;
-  onNavigateToTab: (tab: 'customers' | 'drivers' | 'map' | 'history') => void;
+  onNavigateToTab: (tab: 'customers' | 'drivers' | 'orders' | 'map' | 'history') => void;
 }
 
 type FilterType = 'all' | 'today' | 'has_location' | 'no_location';
@@ -31,6 +34,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   user,
   customers,
   drivers,
+  allUsers,
   onOpenAddCustomer,
   onSelectCustomer,
   onQuickSendToDriver,
@@ -43,6 +47,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAddedCount = customers.filter((c) => c.createdAt.startsWith(todayStr)).length;
   const activeDriversCount = drivers.filter((d) => d.status === 'active').length;
+  const onlineDriversCount = drivers.filter((d) => isDriverOnline(d, allUsers)).length;
+  const totalDriversCount = drivers.length;
 
   // Filtered customers
   const canAddCustomers = user?.permissions?.canAddCustomers !== false;
@@ -149,21 +155,33 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           <div className="text-2xl font-black tracking-tight">{todayAddedCount}</div>
         </div>
 
-        {/* Active Drivers */}
+        {/* Online vs Total Drivers Summary Card (Immediate overview without entering Admin panel) */}
         <div
           onClick={() => onNavigateToTab('drivers')}
-          className="col-span-2 sm:col-span-1 p-4 bg-slate-800 text-white rounded-2xl shadow-md border border-slate-700 cursor-pointer hover:scale-[1.02] transition"
+          className="col-span-2 sm:col-span-1 p-4 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-md border border-slate-700/80 cursor-pointer hover:scale-[1.02] transition relative overflow-hidden group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-300">
-              Aktiv sürücülər
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center">
-              <Truck className="w-4 h-4 text-blue-400" />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-medium text-slate-300">
+                Onlayn sürücülər
+              </span>
+            </div>
+            <div className="w-7 h-7 rounded-lg bg-slate-800 dark:bg-slate-700 flex items-center justify-center text-blue-400 group-hover:text-white transition">
+              <Truck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black tracking-tight text-white">
-            {activeDriversCount}
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-black tracking-tight text-emerald-400">
+              {onlineDriversCount}
+            </span>
+            <span className="text-sm font-semibold text-slate-400">
+              / {totalDriversCount} aktiv
+            </span>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>Komanda əlçatanlığı</span>
+            <span className="text-blue-400 font-semibold group-hover:underline">Bax &rarr;</span>
           </div>
         </div>
       </div>

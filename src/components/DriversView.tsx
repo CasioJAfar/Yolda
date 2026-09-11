@@ -14,10 +14,12 @@ import { Driver, User } from '../types';
 import { openWhatsApp } from '../lib/whatsapp';
 import { ConfirmModal } from './ConfirmModal';
 import { matchQuery } from '../lib/search';
+import { isDriverOnline, getDriverPresenceLabel } from '../lib/userPresence';
 
 interface DriversViewProps {
   drivers: Driver[];
   user?: User | null;
+  allUsers?: User[];
   onOpenAddDriver: () => void;
   onEditDriver: (driver: Driver) => void;
   onDeleteDriver: (driver: Driver) => void;
@@ -27,6 +29,7 @@ interface DriversViewProps {
 export const DriversView: React.FC<DriversViewProps> = ({
   drivers,
   user,
+  allUsers,
   onOpenAddDriver,
   onEditDriver,
   onDeleteDriver,
@@ -102,48 +105,91 @@ export const DriversView: React.FC<DriversViewProps> = ({
             </p>
           </div>
         ) : (
-          filtered.map((driver) => (
-            <div
-              key={driver.id}
-              className="p-4 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-sm hover:shadow-md transition space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
-                    {driver.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                      {driver.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                      {driver.phone}
-                    </p>
-                    {driver.note && (
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                        {driver.note}
-                      </p>
-                    )}
-                  </div>
-                </div>
+          filtered.map((driver) => {
+            const online = isDriverOnline(driver, allUsers);
+            const presenceText = getDriverPresenceLabel(driver, allUsers);
 
-                <button
-                  onClick={() => onToggleStatus(driver)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 ${
-                    driver.status === 'active'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                      : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                  }`}
-                  title="Statusu dəyişmək üçün klikləyin"
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      driver.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'
+            return (
+              <div
+                key={driver.id}
+                className="p-4 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-sm hover:shadow-md transition space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-sm shadow-inner">
+                        {driver.name.charAt(0).toUpperCase()}
+                      </div>
+                      {/* Green / Grey Online Status Dot */}
+                      <span
+                        className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${
+                          online
+                            ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
+                            : 'bg-slate-400 dark:bg-slate-500'
+                        }`}
+                        title={online ? 'Sürücü onlayndır' : 'Sürücü oflayndır'}
+                      >
+                        {online && (
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                          {driver.name}
+                        </h3>
+                        {/* Status badge */}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+                            online
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              online ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                            }`}
+                          />
+                          <span>{online ? 'Onlayn' : 'Oflayn'}</span>
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                        {driver.phone}
+                      </p>
+
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {presenceText}
+                      </div>
+
+                      {driver.note && (
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                          {driver.note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onToggleStatus(driver)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 ${
+                      driver.status === 'active'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                     }`}
-                  />
-                  <span>{driver.status === 'active' ? 'Aktiv' : 'Deaktiv'}</span>
-                </button>
-              </div>
+                    title="Statusu dəyişmək üçün klikləyin"
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        driver.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'
+                      }`}
+                    />
+                    <span>{driver.status === 'active' ? 'Aktiv' : 'Deaktiv'}</span>
+                  </button>
+                </div>
 
               {/* Action buttons */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/60">
@@ -186,9 +232,10 @@ export const DriversView: React.FC<DriversViewProps> = ({
                 )}
               </div>
             </div>
-          ))
-        )}
-      </div>
+          );
+        })
+      )}
+    </div>
 
       {/* Delete Driver Confirmation Modal */}
       <ConfirmModal

@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   Settings,
   ArrowLeft,
+  Radio,
+  Package,
 } from 'lucide-react';
 import { AdminSection } from '../../types';
 
@@ -28,6 +30,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 }) => {
   const menuItems: { id: AdminSection; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'online-drivers', label: 'Canlı Onlayn Sürücülər', icon: Radio },
+    { id: 'orders', label: 'Bütün Sifarişlər', icon: Package },
     { id: 'users', label: 'İstifadəçilər', icon: UserCheck },
     { id: 'customers', label: 'Bütün Müştərilər', icon: Users },
     { id: 'drivers', label: 'Bütün Sürücülər', icon: Truck },
