@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Users,
   UserCheck,
@@ -11,8 +11,10 @@ import {
   Clock,
   ArrowRight,
   TrendingUp,
+  Wifi,
 } from 'lucide-react';
-import { AuditLog, AdminSection } from '../../types';
+import { AuditLog, AdminSection, User } from '../../types';
+import { isUserOnline } from '../../lib/userPresence';
 
 interface AdminDashboardOverviewProps {
   stats: {
@@ -37,17 +39,28 @@ interface AdminDashboardOverviewProps {
       driverCount: number;
       dispatchCount: number;
       lastLoginAt?: string;
+      lastActiveAt?: string;
+      isOnline?: boolean;
     }>;
   } | null;
+  users?: User[];
   onNavigate: (section: AdminSection) => void;
   onViewUser: (userId: string) => void;
 }
 
 export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
   stats,
+  users,
   onNavigate,
   onViewUser,
 }) => {
+  const onlineUsersCount = useMemo(() => {
+    if (users && users.length > 0) {
+      return users.filter((u) => isUserOnline(u)).length;
+    }
+    return 0;
+  }, [users]);
+
   if (!stats) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400">
@@ -61,7 +74,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
     {
       title: 'Ümumi İstifadəçilər',
       value: stats.totalUsers,
-      subtext: `${stats.activeUsers} aktiv, ${stats.inactiveUsers} deaktiv`,
+      subtext: `${onlineUsersCount} onlayn • ${stats.activeUsers} aktiv`,
       icon: UserCheck,
       color: 'blue',
       section: 'users' as AdminSection,
@@ -218,36 +231,53 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           </div>
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-            {stats.userActivities.map((u) => (
-              <div
-                key={u.id}
-                onClick={() => onViewUser(u.id)}
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-2 px-2 rounded-xl transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
-                    {u.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                        {u.name}
-                      </span>
-                      {u.role === 'admin' ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 rounded">
-                          Admin
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium px-1.5 py-0.2 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded">
-                          İstifadəçi
-                        </span>
+            {stats.userActivities.map((u) => {
+              const matchedUser = users?.find((usr) => usr.id === u.id);
+              const online = matchedUser ? isUserOnline(matchedUser) : Boolean(u.isOnline);
+              return (
+                <div
+                  key={u.id}
+                  onClick={() => onViewUser(u.id)}
+                  className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-2 px-2 rounded-xl transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                      {online && (
+                        <span
+                          className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 animate-pulse"
+                          title="İndi Onlayndır"
+                        />
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {u.customerCount} müştəri • {u.driverCount} sürücü • {u.dispatchCount} göndəriş
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white">
+                          {u.name}
+                        </span>
+                        {online && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Onlayn
+                          </span>
+                        )}
+                        {u.role === 'admin' ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 rounded">
+                            Admin
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium px-1.5 py-0.2 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded">
+                            İstifadəçi
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {u.customerCount} müştəri • {u.driverCount} sürücü • {u.dispatchCount} göndəriş
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="text-right">
                   <span
@@ -264,7 +294,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
 

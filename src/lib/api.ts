@@ -614,12 +614,28 @@ export const Api = {
   // --- Admin User & Permissions ---
   async getAdminUsers(): Promise<User[]> {
     try {
-      const list = await apiRequest<User[]>('/api/admin/users');
-      // Save all users to Firestore
-      for (const u of list) {
-        FirebaseSync.saveUser(u).catch(() => {});
+      const fbUsers = await FirebaseSync.fetchUsersFromFirestore();
+      const fbMap = new Map<string, User>();
+      for (const u of fbUsers) {
+        if (u && u.id) fbMap.set(u.id, u);
       }
-      return list;
+
+      let list = await apiRequest<User[]>('/api/admin/users').catch(() => []);
+      if (!list || list.length === 0) {
+        return fbUsers;
+      }
+
+      // Merge online presence & Firestore data
+      const mergedList = list.map((u) => {
+        const fbUser = fbMap.get(u.id);
+        return {
+          ...u,
+          isOnline: fbUser?.isOnline !== undefined ? fbUser.isOnline : u.isOnline,
+          lastActiveAt: fbUser?.lastActiveAt || u.lastActiveAt,
+        };
+      });
+
+      return mergedList;
     } catch (err) {
       const fbUsers = await FirebaseSync.fetchUsersFromFirestore();
       if (fbUsers && fbUsers.length > 0) {

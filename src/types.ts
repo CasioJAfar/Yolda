@@ -76,6 +76,7 @@ export interface User {
   dispatchCount?: number;
   lastLoginAt?: string;
   lastActiveAt?: string;
+  isOnline?: boolean;
   createdAt: string;
 }
 

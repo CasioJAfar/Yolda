@@ -365,6 +365,7 @@ export const AdminFullPanel: React.FC<AdminFullPanelProps> = ({
           {currentSection === 'dashboard' && (
             <AdminDashboardOverview
               stats={stats}
+              users={users}
               onNavigate={setCurrentSection}
               onViewUser={handleViewUserById}
             />

@@ -10,8 +10,6 @@ import {
   Shield,
   Wifi,
   WifiOff,
-  Cloud,
-  Code2,
   Settings,
 } from 'lucide-react';
 import { User } from '../types';
@@ -24,7 +22,7 @@ interface NavbarProps {
   onToggleMobileFrame: () => void;
   isOnline: boolean;
   onOpenSettings: () => void;
-  onOpenFlutterExport: () => void;
+  onOpenFlutterExport?: () => void;
   onLogout: () => void;
 }
 
@@ -36,7 +34,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleMobileFrame,
   isOnline,
   onOpenSettings,
-  onOpenFlutterExport,
   onLogout,
 }) => {
   return (
@@ -68,15 +65,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Firebase Cloud Sync Status */}
-          <div
-            title="Firebase Bulud Sinxronizasiyası aktivdir: Məlumatlar kompüter və telefon arasında canlı sinxronlaşır"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
-          >
-            <Cloud className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-pulse" />
-            <span className="hidden sm:inline">Firebase Canlı</span>
-          </div>
-
           {/* Online/Offline status */}
           <div
             title={isOnline ? 'İnternet bağlantısı aktivdir' : 'Offline rejim (Yaddaşdan işləyir)'}
@@ -89,16 +77,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
             <span>{isOnline ? 'Onlayn' : 'Oflayn'}</span>
           </div>
-
-          {/* Flutter Code Modal Trigger */}
-          <button
-            onClick={onOpenFlutterExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition"
-            title="Flutter layihə fayllarını göstər / Yüklə"
-          >
-            <Code2 className="w-4 h-4 text-blue-500" />
-            <span className="hidden sm:inline">Flutter Kodu</span>
-          </button>
 
           {/* Device Frame Toggle */}
           <button
@@ -125,8 +103,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={onOpenSettings}
                 className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
               >
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-xs">
-                  {user.role === 'admin' ? <Shield className="w-4 h-4" /> : user.name.charAt(0).toUpperCase()}
+                <div className="relative">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-xs">
+                    {user.role === 'admin' ? <Shield className="w-4 h-4" /> : user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" title="Aktiv" />
                 </div>
                 <div className="hidden lg:block">
                   <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-none">

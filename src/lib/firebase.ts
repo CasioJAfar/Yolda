@@ -428,15 +428,37 @@ export const FirebaseSync = {
     }
   },
 
+  // Update user online presence heartbeat
+  async updateUserPresence(userId: string, isOnline: boolean): Promise<void> {
+    if (!userId) return;
+    try {
+      await setDoc(
+        doc(db, 'users', userId),
+        {
+          isOnline,
+          lastActiveAt: new Date().toISOString(),
+          _syncedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      // Non-blocking for offline cases
+      console.warn('[Firebase] Presence update error:', error);
+    }
+  },
+
   async fetchUsersFromFirestore(): Promise<User[]> {
     try {
       const snap = await getDocs(collection(db, 'users'));
-      const list: User[] = [];
+      const map = new Map<string, User>();
       snap.forEach((d) => {
         const data = d.data() as User;
-        if (data && data.id) list.push(data);
+        const id = data?.id || d.id;
+        if (id) {
+          map.set(id, { ...data, id });
+        }
       });
-      return list;
+      return Array.from(map.values());
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'users');
       return [];
@@ -448,12 +470,15 @@ export const FirebaseSync = {
       return onSnapshot(
         collection(db, 'users'),
         (snap) => {
-          const list: User[] = [];
+          const map = new Map<string, User>();
           snap.forEach((d) => {
             const data = d.data() as User;
-            if (data && data.id) list.push(data);
+            const id = data?.id || d.id;
+            if (id) {
+              map.set(id, { ...data, id });
+            }
           });
-          onUpdate(list);
+          onUpdate(Array.from(map.values()));
         },
         (err) => console.warn('[Firebase] Users dinləmə xətası', err)
       );
